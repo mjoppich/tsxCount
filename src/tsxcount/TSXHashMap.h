@@ -77,7 +77,8 @@ public:
               m_iStorageBits( (uint32_t) std::ceil(std::log(iStorage)) ),
               m_iK( iK ),
               m_iMapSize( UBigInt::createFromBitShift(iExpLength, iExpLength) ),
-              m_iKeyValBits( 2 * iK - iExpLength + iStorage )
+              m_iKeyValBits( 2 * iK - iExpLength + iStorage ),
+              m_iReprobeBits( iExpLength )
     {
 
         if (2 * m_iK <= iExpLength)
@@ -124,7 +125,7 @@ public:
 
         m_iReprobeMask = UBigInt(2*m_iK, true);
         m_iKeyMask = UBigInt(2*m_iK, true);
-        m_iKeyMask = (~m_iKeyMask >> iExpLength);
+        m_iKeyMask = (~m_iKeyMask >> m_iReprobeBits) << m_iReprobeBits;
         m_iReprobeMask = ~m_iKeyMask;
 
         std::cerr << "Key Mask" << std::endl;
@@ -193,18 +194,94 @@ protected:
 
     }
 
-    TSX::tsx_key_t extractKey(TSX::tsx_keyval_t& keyval)
+    TSX::tsx_keyval_t extractKey(TSX::tsx_keyval_t keyval)
     {
-
+        return keyval >> m_iStorageBits;
     }
 
-    bool positionMatchesKey(uint64_t pos, tsx_key_t& key)
+
+    bool positionMatchesKey(uint64_t pos, TSX::tsx_key_t& key, TSX::tsx_reprobe_t iReprobe)
     {
 
         TSX::tsx_keyval_t oKeyVal = getElement(pos);
         TSX::tsx_key_t oKey = this->extractKey(oKeyVal);
 
-        return (oKey == key);
+
+        // the key matches
+        bool keyPartMatch = (oKey >> m_iReprobeBits) == (key >> (m_iReprobeBits + m_iStorageBits));
+        // and the reprobe matches
+        bool reprobePartMatch = this->positionMatchesReprobe(pos, key, iReprobe);
+
+        return keyPartMatch && reprobePartMatch;
+    }
+
+    bool positionMatchesReprobe(uint64_t pos, TSX::tsx_key_t& key, TSX::tsx_reprobe_t iReprobe)
+    {
+
+        TSX::tsx_keyval_t oKeyVal = getElement(pos);
+        TSX::tsx_key_t oKey = this->extractKey(oKeyVal);
+
+        // only check the reprobe part matches
+        bool reprobeMatch = (oKey & m_iReprobeMask) == iReprobe;
+
+        if (reprobeMatch)
+            return true;
+
+        return false;
+
+    }
+
+    bool positionEmpty(uint64_t iPos)
+    {
+
+        tsx_keyval_t element = this->getElement(iPos);
+
+        return element == 0;
+    }
+
+    TSX::tsx_val_t extractVal(TSX::tsx_keyval_t keyval)
+    {
+        return keyval & (~m_iKeyMask);
+    }
+
+    bool setElement(uint64_t iPosition, tsx_key_t key, tsx_reprobe_t reprobes, uint8_t incremenet)
+    {
+
+        TSX::tsx_keyval_t oKeyVal = getElement(iPosition);
+        TSX::tsx_val_t oVal = this->extractVal(oKeyVal);
+
+        
+    }
+
+    bool handleOverflow(uint64_t iPos, tsx_key_t iKey, tsx_reprobe_t iReprobe)
+    {
+        bool bHandled = false;
+
+        iReprobe += 1;
+        tsx_reprobe_t iPerformedReprobes = 0;
+
+        while (!bHandled)
+        {
+
+            ++iPerformedReprobes;
+            uint64_t iPos = this->getPosition(iKey, iReprobe);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (bEmpty)
+            {
+
+                this->setElement(iPos, iPerformedReprobes, iReprobe, 1);
+
+            } else {
+
+                bool bMatchesKey = positionMatchesReprobe(iPos, iKey, iPerformedReprobes);
+
+            }
+
+        }
+
 
     }
 
@@ -216,7 +293,6 @@ protected:
 
         tsx_key_t iKey = m_pHashingFunction->apply(iKmer);
 
-
         while (!bInserted)
         {
 
@@ -224,16 +300,39 @@ protected:
             uint64_t iPos = this->getPosition(iKey, iReprobe);
 
             // does this position match to key?
-            bool bMatchesKey = positionMatchesKey(iPos, iKey);
+            bool bEmpty = positionEmpty(iPos);
 
-            if (bMatchesKey) {
-                // insert new value
-
+            if (bEmpty)
+            {
+                this->setElement(iPos, iKey, iReprobe, 1);
 
                 bInserted = true;
+                break;
+
+            } else {
+
+                bool bMatchesKey = positionMatchesKey(iPos, iKey, iReprobe);
+
+                if (bMatchesKey)
+                {
+
+                    bool bOverflow = this->setElement(iPos, iKey, iReprobe, 1);
+
+                    if (bOverflow)
+                        handleOverflow(iPos, iKey, iReprobe);
+
+                    bInserted = true;
+                    break;
+
+                } else {
+                    ++iReprobe;
+                    continue;
+                }
+
+
             }
 
-            ++iReprobe;
+
         }
 
     }
@@ -265,6 +364,8 @@ protected:
     const uint32_t m_iStorageBits;
     const uint32_t m_iK;
     const uint32_t m_iKeyValBits;
+
+    const uint32_t m_iReprobeBits;
 
     const UBigInt m_iMapSize;
 
