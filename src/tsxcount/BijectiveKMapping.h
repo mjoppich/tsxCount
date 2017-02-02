@@ -90,6 +90,8 @@ public:
             throw BijectiveMappingNoInverseException(this);
         }
 
+        std::cout << this->printMatrix(m_pA) << std::endl;
+
         m_pArows = this->matrixToRows(m_pA);
         m_pAirows = this->matrixToRows(m_pAi);
 
@@ -198,12 +200,16 @@ protected:
 
     UBigInt applyto(UBigInt& oValue, UBigInt* pRows)
     {
-        UBigInt oReturn(oValue.getBitCount(), true);
+        UBigInt oReturn(m_matN, true);
 
         for (uint32_t i = 0; i < m_matN; ++i)
         {
 
-            UBigInt oRes = pRows[i] ^ oValue;
+            UBigInt oRes = pRows[i] & oValue; // was ^ for whatever reason? (XOR)
+
+            std::cerr << pRows[i].to_string() << std::endl;
+            std::cerr << oValue.to_string() << std::endl;
+            std::cerr << oRes.to_string() << std::endl;
 
             uint32_t iBitSum = oRes.sumBits();
 
@@ -219,24 +225,26 @@ protected:
 
     UBigInt* matrixToRows( int8_t* pMatrix) {
 
-        UBigInt* pReturn = (UBigInt*) malloc(  sizeof(UBigInt) * m_iK * 2);
+        UBigInt* pReturn = new UBigInt[m_iK * 2];
 
         for (uint32_t i = 0; i < m_iK * 2; ++i)
         {
 
-            UBigInt oRet(2*m_iK);
-            memcpy(pReturn + i, &oRet, sizeof(UBigInt));
+            pReturn[i].resize(m_iK*2);
+            //memcpy(pReturn + i, &oRet, sizeof(UBigInt));
 
             //pReturn[i] = oRet;
 
             for (uint32_t j = 0; j < m_iK * 2; ++j)
             {
 
-                uint8_t iValue = (pMatrix[pos(i,j)]  != 0) ? 1 : 0;
+                uint8_t iValue = pMatrix[pos(i,j)];
 
-                pReturn[i].setBit(2*m_iK - 1 - j, iValue);
+                pReturn[i].setBit(2*m_iK - 1 -j, iValue);
 
             }
+
+            std::cout << pReturn[i].to_string() << std::endl;
 
 
         }

@@ -41,8 +41,16 @@ int main(int argc, char *argv[])
 
     TSXHashMap* pMap = new TSXHashMap(12, 12, 8);
 
-    pMap->addKmer(0);
-    pMap->addKmer(1);
+    UBigInt oKmer1(0);
+    UBigInt oKmer2(1);
+
+    oKmer1.resize(16);
+    oKmer2.resize(16);
+
+
+    pMap->addKmer( oKmer1 );
+    pMap->addKmer( oKmer2 );
+    pMap->addKmer( oKmer1 );
 
 
     return 0;

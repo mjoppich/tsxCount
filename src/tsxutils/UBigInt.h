@@ -15,6 +15,7 @@
 #include <functional>
 #include <iostream>
 #include <bitset>
+#include <tkPort.h>
 
 
 #ifndef BITSTOFIELDS
@@ -118,6 +119,10 @@ public:
     }
 
 
+    /**
+     *
+     * @return string starting with highest bit to lowest bit (0 = unset, 1 = set)
+     */
     std::string to_string() const
     {
         std::stringstream oSS;
@@ -153,6 +158,27 @@ public:
         UBigInt oReturn = UBigInt(iLength, true);
 
         oReturn.copy_content_bits(pPos, iOffsetBits, iLength);
+
+        return oReturn;
+    }
+
+    /**
+     *
+     * @param pPosition array start
+     * @param iIdx array offset (bytes)
+     * @param iOffsetBits offset in byte
+     * @param oValue @UBigInt to store in array
+     * @return
+     */
+    static void storeIntoMemory(uint8_t* pPosition, uint64_t iIdx, uint8_t iOffsetBits, UBigInt& oValue, size_t iBits = -1)
+    {
+
+        uint8_t* pPos = pPosition + iIdx;
+
+        if (iBits == -1)
+            iBits = oValue.getBitCount();
+
+        oValue.copy_content_to_array(pPos, iOffsetBits, iBits);
 
     }
 
@@ -203,6 +229,41 @@ public:
     ~UBigInt()
     {
         this->reset();
+    }
+
+    /**
+     *
+     * @brief resizes this UBigInt such that it can hold iBits
+     * @param iBits number of bits this element can hold
+     */
+    void resize(uint32_t iBits)
+    {
+        FIELDTYPE* pOldArray = m_pArray;
+        uint32_t iOldBits = m_iBits;
+
+        m_pArray = NULL;
+
+        this->initialize(iBits);
+        m_iUnusedBitsMask = this->createUnusedBitsMask();
+
+        if (pOldArray != NULL)
+        {
+
+            uint64_t bits = std::min(iOldBits, m_iBits);
+            div_t fields = div( bits, m_iFieldSize );
+
+            // copy old data over
+            for (uint32_t i = 0; i < fields.quot; ++i)
+            {
+                m_pArray[i] = pOldArray[i];
+            }
+
+            m_pArray[ fields.quot ] = (pOldArray[fields.quot] << (m_iFieldSize-fields.rem)) >> (m_iFieldSize-fields.rem);
+
+            delete pOldArray;
+
+        }
+
     }
 
     UBigInt(uint64_t iValue)
@@ -302,7 +363,7 @@ public:
 
     UBigInt operator & (const UBigInt & oOther)
     {
-        UBigInt oRet(this->self() );
+        UBigInt oRet( this->self() );
         oRet.bitAnd(oOther);
 
         return oRet;
@@ -325,19 +386,94 @@ public:
         return oRet;
     }
 
+    bool isEqual(const UBigInt* pLeft, const UBigInt* pRight, uint32_t iBits)
+    {
+        div_t procs = div(iBits, m_iFieldSize);
+
+        for (size_t i = 0; i < procs.quot-1; ++i)
+        {
+            if (pLeft->m_pArray[i] != pRight->m_pArray[i])
+                return false;
+        }
+
+        size_t iShift = procs.rem;
+
+        FIELDTYPE thisRemain = pLeft->m_pArray[procs.quot-1] << iShift;
+        FIELDTYPE otherRemain = pRight->m_pArray[procs.quot-1] << iShift;
+
+        bool result = (thisRemain == otherRemain);
+
+        return result;
+    }
+
+    bool restZero(const UBigInt* pElement, uint32_t iOffsetBits)
+    {
+
+        div_t procs = div(iOffsetBits, pElement->m_iFieldSize);
+
+        FIELDTYPE thisRemain = pElement->m_pArray[procs.quot-1] >> procs.rem;
+
+        if (thisRemain != 0)
+            return false;
+
+        for (size_t i = procs.quot; i < pElement->m_iFields-1; ++i)
+        {
+
+            if (pElement->m_pArray[i] != 0)
+                return false;
+
+        }
+
+        FIELDTYPE value = pElement->m_pArray[pElement->m_iFields-1] << (pElement->m_iBits % m_iFieldSize);
+
+        if (value != 0)
+            return false;
+
+        return true;
+
+    }
+
     bool operator == (const UBigInt & oOther)
     {
 
+        // rational: if this and other have same bits: all bits must equal
 
-        throw "not yet implemented";
+        if (this->m_iBits == oOther.m_iBits)
+        {
+            return this->isEqual(this, &oOther, this->m_iBits);
 
+        } else {
 
+            if (this->m_iBits < oOther.m_iBits)
+            {
 
+                bool commonEqual = this->isEqual(this, &oOther, this->m_iBits);
+
+                bool restZero = this->restZero(&oOther, this->m_iBits);
+
+                return commonEqual && restZero;
+
+            } else {
+                bool commonEqual = this->isEqual(this, &oOther, oOther.m_iBits);
+
+                bool restZero = this->restZero(this, oOther.m_iBits);
+
+                return commonEqual && restZero;
+            }
+
+        }
+
+        return false;
 
     }
 
     uint64_t toUInt()
     {
+        if (m_iBits > 64)
+        {
+            throw ("Cannot represent BigInt in 64bits!");
+        }
+
         if (m_iBits <= m_iFieldSize)
         {
 
@@ -354,12 +490,12 @@ public:
             // iBits > iFieldSize
             // assemble this uint64_t from multiple fields
 
-            uint32_t iNeeded = std::ceil( 64.0 / m_iFieldSize );
+            size_t iNeeded = m_iFields;
             uint64_t iReturn = 0;
 
-            for (uint8_t i = iNeeded; i > 0; --i)
+            for (uint8_t i = 0; i < iNeeded; ++i)
             {
-
+                std::cerr << std::bitset<8>(m_pArray[i]) << std::endl;
                 iReturn |= m_pArray[i] << (i*m_iFieldSize);
 
             }
@@ -682,36 +818,7 @@ protected:
 
     }
 
-    /**
-     *
-     * @brief resizes this UBigInt such that it can hold iBits
-     *
-     * @param iBits number of bits this element can hold
-     */
-    void resize(uint32_t iBits)
-    {
-        FIELDTYPE* pOldArray = m_pArray;
-        uint32_t iOldFields = m_iFields;
 
-        m_pArray = NULL;
-
-        this->initialize(iBits);
-
-        m_iUnusedBitsMask = this->createUnusedBitsMask();
-
-        if (pOldArray != NULL)
-        {
-            // copy old data over
-            for (uint32_t i = 0; i < iOldFields; ++i)
-            {
-                m_pArray[i] = pOldArray[i];
-            }
-
-            delete pOldArray;
-
-        }
-
-    }
 
     void add(const UBigInt & oOther)
     {
@@ -927,6 +1034,75 @@ protected:
 
     }
 
+    void copy_content_to_array(FIELDTYPE* pSrc, uint64_t iBitStart, uint64_t iBitCount)
+    {
+
+        uint8_t iOffset = iBitStart % m_iFieldSize;
+        uint64_t iStartField = iBitStart / m_iFieldSize;
+        uint64_t iBitsRead = 0;
+        uint64_t iMaxField = (iBitStart + iBitCount) / m_iFieldSize;
+
+
+        if (iOffset == 0)
+        {
+
+            uint8_t iUnusedBits = this->m_iBits % m_iFieldSize;
+            if (iUnusedBits != 0)
+                iMaxField -= 1;
+
+            for (size_t i = iStartField; i < iMaxField; ++i)
+            {
+                pSrc[i] = this->m_pArray[i];
+            }
+
+            if (iUnusedBits != 0)
+            {
+                iMaxField -= 1;
+
+                FIELDTYPE oSrc = pSrc[iMaxField];
+                oSrc = (oSrc >> (m_iFieldSize-iUnusedBits)) << (m_iFieldSize-iUnusedBits);
+
+                FIELDTYPE  oOrigin = m_pArray[iMaxField];
+                oOrigin = (oOrigin << iUnusedBits) >> iUnusedBits;
+
+                pSrc[iMaxField] = oSrc | oOrigin;
+            }
+
+        } else {
+
+            // first field
+            FIELDTYPE newval = m_pArray[iStartField] << iOffset;
+            FIELDTYPE oldval = (pSrc[iStartField] << iOffset) >> iOffset;
+            pSrc[iStartField] = newval | oldval;
+
+            size_t iBitsDone = m_iFieldSize - iOffset;
+            for (size_t i = iStartField+1; i < iMaxField-1; ++i)
+            {
+
+                FIELDTYPE iValue = 0;
+                iValue |= (m_pArray[i+1] << (m_iFieldSize - iOffset) | (m_pArray[ i ] >> iOffset));
+
+                pSrc[i] = iValue;
+
+                iBitsDone += 8;
+            }
+
+            uint8_t iBitsRemaining = m_iBits - iBitsDone;
+
+            if (iBitsRemaining > 0)
+            {
+                FIELDTYPE  value = 0;
+                value = (pSrc[iMaxField] >> iBitsRemaining) << iBitsRemaining;
+
+                value |= (m_pArray[iMaxField] << (m_iFieldSize - iBitsRemaining)) >> (m_iFieldSize - iBitsRemaining);
+
+                pSrc[iMaxField] = value;
+            }
+
+        }
+
+    }
+
 
     /**
      *
@@ -990,8 +1166,6 @@ protected:
             }
 
         }
-
-
     }
 
     /**

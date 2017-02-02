@@ -78,7 +78,7 @@ public:
               m_iK( iK ),
               m_iMapSize( UBigInt::createFromBitShift(iExpLength, iExpLength) ),
               m_iKeyValBits( 2 * iK - iExpLength + iStorage ),
-              m_iReprobeBits( iExpLength )
+              m_iReprobeBits( iExpLength ), m_iMaxReprobes( (uint32_t) (1 << iExpLength)-1 )
     {
 
         if (2 * m_iK <= iExpLength)
@@ -98,6 +98,8 @@ public:
             // 2*k = key, m_iStorageBits = value
             size_t iBitsPerElement = 2 * m_iK + m_iStorageBits;
             size_t iBytes = std::ceil( (float)(iElements * iBitsPerElement) / 8.0f);
+
+            std::cerr << "Creating array " << std::to_string(i) << " with " << std::to_string(iBytes) << " bytes for " << std::to_string(iElements) << " places." << std::endl;
 
             m_pCounterArray[i] = (uint8_t*) calloc( sizeof(uint8_t), iBytes);
 
@@ -144,7 +146,7 @@ public:
         free(m_pCounterArray);
     }
 
-    bool addKmer(tsx_kmer_t kmer)
+    bool addKmer(TSX::tsx_kmer_t& kmer)
     {
         return this->insert_kmer(kmer);
     }
@@ -161,40 +163,30 @@ protected:
         return i*(i+1)/2;
     }
 
-    inline uint64_t getPosition(tsx_kmer_t iKmer, tsx_reprobe_t iReprobe)
+    inline uint64_t getPosition(TSX::tsx_kmer_t& iKmer, TSX::tsx_reprobe_t iReprobe)
     {
 
         // Uk is still in range [0, 4^k -1]
-        tsx_kmer_t Uk = m_pHashingFunction->apply(iKmer) + iReprobe;
+        TSX::tsx_kmer_t Uk = m_pHashingFunction->apply(iKmer) + iReprobe;
+
+        std::cerr << "kmer key: " << Uk.to_string() << std::endl;
+
+        UBigInt mod2 = Uk.mod2( m_iLengthExp );
+
+        std::cerr << "kmer key % 2: " << mod2.to_string() << std::endl;
 
         // Uk.mod2 now is in range [0, M-1] = [0, 2^l -1]
-        uint64_t iPos = Uk.mod2( m_iLengthExp ).toUInt();
+        uint64_t iPos = mod2.toUInt();
 
         return iPos;
     }
 
-    inline TSX::tsx_keyval_t getElement(uint64_t iPosition)
+    TSX::tsx_key_t extractKeyNoReprobe(TSX::tsx_keyval_t& keyval)
     {
-
-        uint8_t iArray = iPosition % 4;
-        iPosition = iPosition >> 4;
-
-        uint8_t* pArray = m_pCounterArray[iArray];
-
-        // we want to get the iPosition-th entry
-
-        uint64_t iStartBit = iPosition * m_iKeyValBits;
-        uint64_t iStartByte = (iStartBit >> 3); // / 8
-        uint8_t iStartOffset = (iStartBit & 0x3); // mod 8
-
-        //UBigInt oReturn(m_iKeyValBits);
-        UBigInt oReturn = UBigInt::createFromMemory(pArray, iStartByte, iStartOffset, m_iKeyValBits);
-
-        return oReturn;
-
+        return keyval >> (m_iStorageBits + m_iReprobeBits);
     }
 
-    TSX::tsx_keyval_t extractKey(TSX::tsx_keyval_t keyval)
+    TSX::tsx_key_t extractKey(TSX::tsx_keyval_t& keyval)
     {
         return keyval >> m_iStorageBits;
     }
@@ -204,11 +196,9 @@ protected:
     {
 
         TSX::tsx_keyval_t oKeyVal = getElement(pos);
-        TSX::tsx_key_t oKey = this->extractKey(oKeyVal);
-
 
         // the key matches
-        bool keyPartMatch = (oKey >> m_iReprobeBits) == (key >> (m_iReprobeBits + m_iStorageBits));
+        bool keyPartMatch = (oKeyVal >> (m_iReprobeBits + m_iStorageBits)) == (key >> (m_iReprobeBits + m_iStorageBits));
         // and the reprobe matches
         bool reprobePartMatch = this->positionMatchesReprobe(pos, key, iReprobe);
 
@@ -231,6 +221,11 @@ protected:
 
     }
 
+    /**
+     * checks if position has been yet used or is empty
+     * @param iPos
+     * @return true if position was never used
+     */
     bool positionEmpty(uint64_t iPos)
     {
 
@@ -239,28 +234,138 @@ protected:
         return element == 0;
     }
 
-    TSX::tsx_val_t extractVal(TSX::tsx_keyval_t keyval)
+    /**
+     * given a keyval, constructs the value part
+     * @param keyval
+     * @return value part of keyval entry
+     */
+    TSX::tsx_val_t extractVal(TSX::tsx_keyval_t& keyval)
     {
         return keyval & (~m_iKeyMask);
     }
 
-    bool setElement(uint64_t iPosition, tsx_key_t key, tsx_reprobe_t reprobes, uint8_t incremenet)
+    /**
+     *
+     * @param pos
+     * @return keyval of element at position pos in array
+     */
+    inline TSX::tsx_keyval_t getElement(uint64_t pos)
     {
 
-        TSX::tsx_keyval_t oKeyVal = getElement(iPosition);
-        TSX::tsx_val_t oVal = this->extractVal(oKeyVal);
+        uint8_t iArray = pos % 4;
+        pos = pos >> 4;
 
-        
+        uint8_t* pArray = m_pCounterArray[iArray];
+
+        // we want to get the iPosition-th entry
+
+        uint64_t iStartBit = pos * m_iKeyValBits;
+        uint64_t iStartByte = (iStartBit >> 3); // / 8
+        uint8_t iStartOffset = (iStartBit & 0x3); // mod 8
+
+        //UBigInt oReturn(m_iKeyValBits);
+        UBigInt oReturn = UBigInt::createFromMemory(pArray, iStartByte, iStartOffset, m_iKeyValBits);
+
+        std::cerr << "keyval fetched: " << oReturn.to_string() << " from array " << std::to_string(iArray) << " in pos " << std::to_string(pos) << std::endl;
+
+        return oReturn;
+
     }
 
-    bool handleOverflow(uint64_t iPos, tsx_key_t iKey, tsx_reprobe_t iReprobe)
+    void storeElement(uint64_t pos, TSX::tsx_key_t& key, TSX::tsx_val_t& val)
+    {
+
+        TSX::tsx_keyval_t oKeyVal = (key << m_iStorageBits) | val;
+
+        uint8_t iArray = pos % 4;
+        pos = pos >> 4;
+
+        uint8_t* pArray = m_pCounterArray[iArray];
+
+        // we want to get the iPosition-th entry
+
+        uint64_t iStartBit = pos * m_iKeyValBits;
+        uint64_t iStartByte = (iStartBit >> 3); // / 8
+        uint8_t iStartOffset = (iStartBit & 0x3); // mod 8
+
+        oKeyVal.resize(m_iKeyValBits);
+
+        //UBigInt oReturn(m_iKeyValBits);
+        UBigInt::storeIntoMemory(pArray, iStartByte, iStartOffset, oKeyVal, m_iKeyValBits);
+
+        std::cerr << "keyval stored: " << oKeyVal.to_string() << " into array " << std::to_string(iArray) << " in pos " << std::to_string(pos) << std::endl;
+
+    }
+
+
+    /**
+     *
+     * @param iPosition position in array
+     * @param key key to look for
+     * @param reprobes amount reprobes used
+     * @param bKeyIsValue if true, the key part belongs to value
+     * @return
+     */
+    bool incrementElement(uint64_t iPosition, TSX::tsx_key_t& key, TSX::tsx_reprobe_t reprobes, bool bKeyIsValue)
+    {
+
+        TSX::tsx_keyval_t keyval = getElement(iPosition);
+        TSX::tsx_val_t value = this->extractVal(keyval);
+
+        if (~value == 0)
+        {
+            // an overflow is going to happen!
+            value = 1;
+
+            // maybe we can prevent the overflow?
+            if (bKeyIsValue)
+            {
+
+                TSX::tsx_key_t keyVal = this->extractKeyNoReprobe(keyval);
+
+                if (~keyVal == 0)
+                {
+                    // overflow in key part
+                    keyVal = 0;
+
+                    keyVal = (keyVal << m_iReprobeBits) | reprobes;
+
+                    storeElement(iPosition, keyVal, value);
+
+                    return true;
+
+                } else {
+                    key += 1;
+
+                    keyVal = (keyVal << m_iReprobeBits) | reprobes;
+
+                    storeElement(iPosition, keyVal, value);
+                    return false;
+                }
+
+            }
+
+            // overflow occurred!
+            return true;
+        } else {
+
+            value += 1;
+
+            // key does not change here
+            storeElement(iPosition, key, value);
+            return false;
+
+        }
+    }
+
+    bool handleOverflow(uint64_t iPos, TSX::tsx_key_t& iKey, TSX::tsx_reprobe_t iReprobe)
     {
         bool bHandled = false;
 
         iReprobe += 1;
-        tsx_reprobe_t iPerformedReprobes = 0;
+        tsx_reprobe_t iPerformedReprobes = 1;
 
-        while (!bHandled)
+        while (iPerformedReprobes < m_iMaxReprobes)
         {
 
             ++iPerformedReprobes;
@@ -272,54 +377,78 @@ protected:
             if (bEmpty)
             {
 
-                this->setElement(iPos, iPerformedReprobes, iReprobe, 1);
+                // there can not be an overflow ;)
+                this->incrementElement(iPos, iKey, iPerformedReprobes, true);
+
+                return true;
 
             } else {
 
                 bool bMatchesKey = positionMatchesReprobe(iPos, iKey, iPerformedReprobes);
 
+                bool bOverflow = this->incrementElement(iPos, iKey, iPerformedReprobes, true);
+
+                if (!bOverflow)
+                {
+                    return true;
+                }
+
             }
 
         }
 
+        return false;
 
     }
 
-    bool insert_kmer(tsx_kmer_t iKmer, uint8_t iCount = 1)
+    bool insert_kmer(TSX::tsx_kmer_t& iKmer, uint8_t iCount = 1)
     {
 
         bool bInserted = false;
-        tsx_reprobe_t iReprobe = 0;
+        TSX::tsx_reprobe_t iReprobe = 1;
 
-        tsx_key_t iKey = m_pHashingFunction->apply(iKmer);
+        TSX::tsx_key_t iBaseKey = m_pHashingFunction->apply(iKmer);
+
+        std::cerr << "new iKmer " << iKmer.to_string() << std::endl;
+        std::cerr << "new basekey " << iBaseKey.to_string() << std::endl;
 
         while (!bInserted)
         {
 
             // get possible position
-            uint64_t iPos = this->getPosition(iKey, iReprobe);
+            uint64_t iPos = this->getPosition(iKmer, iReprobe);
 
             // does this position match to key?
             bool bEmpty = positionEmpty(iPos);
 
             if (bEmpty)
             {
-                this->setElement(iPos, iKey, iReprobe, 1);
+
+                TSX::tsx_key_t invReprobe = ~m_iReprobeMask;
+                std::cerr << "reprobe " << invReprobe.to_string() << std::endl;
+
+                TSX::tsx_key_t key = (iBaseKey & invReprobe);
+                std::cerr << "key and inv " << key.to_string() << std::endl;
+                key = key | iReprobe;
+
+                std::cerr << "create keyval: " << key.to_string() << " for key " << key.to_string() << " and reprobes: " << iReprobe << std::endl;
+
+                this->incrementElement(iPos, key, iReprobe, false);
 
                 bInserted = true;
                 break;
 
             } else {
 
-                bool bMatchesKey = positionMatchesKey(iPos, iKey, iReprobe);
+                bool bMatchesKey = positionMatchesKey(iPos, iBaseKey, iReprobe);
 
                 if (bMatchesKey)
                 {
 
-                    bool bOverflow = this->setElement(iPos, iKey, iReprobe, 1);
+                    bool bOverflow = this->incrementElement(iPos, iBaseKey, iReprobe, 1);
 
                     if (bOverflow)
-                        handleOverflow(iPos, iKey, iReprobe);
+                        handleOverflow(iPos, iBaseKey, iReprobe);
 
                     bInserted = true;
                     break;
@@ -366,6 +495,7 @@ protected:
     const uint32_t m_iKeyValBits;
 
     const uint32_t m_iReprobeBits;
+    const uint32_t m_iMaxReprobes;
 
     const UBigInt m_iMapSize;
 
