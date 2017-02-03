@@ -928,19 +928,19 @@ protected:
             throw new UBigIntNotLargeEnough(this, iLength);
 
         const uint8_t iFields = std::ceil( iLength / m_iFieldSize );
+        const div_t fields = div(iLength, m_iFieldSize);
 
         uint8_t i = 0;
-        for (i = 0; i < iFields; ++i)
+        for (i = 0; i < fields.quot; ++i)
         {
             FIELDTYPE iInsert = pSrc[i];
             m_pArray[i] = iInsert;
         }
 
-        uint64_t iOvercopied = iFields * m_iFieldSize - iLength;
-        if (iOvercopied > 0)
+        if (fields.rem > 0)
         {
 
-            m_pArray[i-1] = (m_pArray[i-1] << iOvercopied) >> iOvercopied;
+            m_pArray[ fields.quot ] = (pSrc[fields.quot] << (m_iFieldSize-fields.rem)) >> (m_iFieldSize-fields.rem);
 
         }
 
