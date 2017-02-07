@@ -13,8 +13,6 @@
 #include "TSXTypes.h"
 #include "BijectiveKMapping.h"
 
-#include <fastxtools/SequenceUtils.h>
-#include <fastxtools/Sequence.h>
 #include <iostream>
 #include <bitset>
 
@@ -477,9 +475,9 @@ protected:
     uint8_t m_iCounterArrays = -1;
     uint8_t** m_pCounterArray;
 
-    tsx_key_t m_iKeyMask = 0;
-    tsx_val_t m_iValMask = 0;
-    tsx_key_t m_iReprobeMask = 0;
+    TSX::tsx_key_t m_iKeyMask = 0;
+    TSX::tsx_val_t m_iValMask = 0;
+    TSX::tsx_key_t m_iReprobeMask = 0;
 //    tsx_kmer_t m_iReprobeMask = 0;
 
 

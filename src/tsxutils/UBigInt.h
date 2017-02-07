@@ -15,7 +15,6 @@
 #include <functional>
 #include <iostream>
 #include <bitset>
-#include <tkPort.h>
 
 
 #ifndef BITSTOFIELDS
