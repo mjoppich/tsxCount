@@ -13,8 +13,6 @@
 #include "TSXTypes.h"
 #include "BijectiveKMapping.h"
 
-#include <fastxtools/SequenceUtils.h>
-#include <fastxtools/Sequence.h>
 #include <iostream>
 #include <bitset>
 #include <tkPort.h>
@@ -545,7 +543,6 @@ protected:
 
     TSX::tsx_key_t m_mask_reprobe_func = 0;
     TSX::tsx_key_t m_mask_func_reprobe = 0;
-
 
 
     /*

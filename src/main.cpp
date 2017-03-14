@@ -3,6 +3,7 @@
 
 
 #include <tsxcount/TSXHashMap.h>
+#include <tsxcount/TSXTypes.h>
 
 int main(int argc, char *argv[])
 {
@@ -47,8 +48,8 @@ int main(int argc, char *argv[])
     oKmer1.resize(8);
     oKmer2.resize(8);
 
-    UBigInt oTest(3);
-    oTest.resize(6);
+    TSX::print_kmer_t(oKmer1);
+
 
     /*
     oTest = ~oTest;

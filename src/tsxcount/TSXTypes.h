@@ -40,6 +40,12 @@ namespace TSX
 
     // higher 2k-l bits of key
     typedef UBigInt tsx_func_t;
+
+    std::string print_kmer_t(TSX::tsx_kmer_t& elem);
+    std::string print_key_t(TSX::tsx_key_t& elem);
+    std::string print_val_t(TSX::tsx_val_t& elem, uint32_t ikeybits = 32);
+    std::string print_keyval_t(TSX::tsx_keyval_t& elem, uint32_t iStorageBits = 3);
+
 }
 
 #endif //TSXCOUNT_TSXTYPES_H
