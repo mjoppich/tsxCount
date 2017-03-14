@@ -77,7 +77,7 @@ public:
               m_iK( iK ),
               m_iMapSize( UBigInt::createFromBitShift(iL, iL) ),
               m_iKeyValBits( 2 * iK + iStorageBits ),
-              m_iReprobeBits( iL ), m_iMaxReprobes( (uint32_t) (1 << iL)-1 )
+              m_iMaxReprobes( (uint32_t) (1 << iL)-1 )
     {
 
         if (2 * m_iK <= m_iL)
@@ -187,7 +187,7 @@ protected:
         TSX::tsx_keyval_t oKeyVal = getElement(pos);
 
         // the key matches
-        bool keyPartMatch = (oKeyVal >> (m_iReprobeBits + m_iStorageBits)) == (key >> (m_iReprobeBits));
+        bool keyPartMatch = (oKeyVal >> (m_iL + m_iStorageBits)) == (key >> (m_iL));
         // and the reprobe matches
         bool reprobePartMatch = this->positionMatchesReprobe(pos, key, iReprobe);
 
@@ -378,11 +378,9 @@ protected:
 
                 if (~funcpart == 0)
                 {
-                    // overflow in func key part
+                    // overflow in func key part => set funcpart = 0 and propagate overflow further
                     funcpart = 0;
-
-                    TSX::tsx_key_t updkey = (UBigInt(funcpart, 2*m_iK) << m_iReprobeBits) | reprobes;
-
+                    TSX::tsx_key_t updkey = (UBigInt(funcpart, 2*m_iK) << m_iL) | reprobes;
                     storeElement(iPosition, updkey, value);
 
                     return true;
@@ -391,13 +389,22 @@ protected:
 
                     funcpart += 1;
 
-                    TSX::tsx_key_t updkey = (UBigInt(funcpart, 2*m_iK) << m_iReprobeBits) | reprobes;
+                    TSX::tsx_key_t updkey = (UBigInt(funcpart, 2*m_iK) << m_iL) | reprobes;
+                    value = 0;
+                    value.resize(m_iStorageBits);
 
                     storeElement(iPosition, updkey, value);
                     return false;
                 }
 
             }
+
+            // also set value == 0
+            TSX::tsx_key_t updkey = (key & m_mask_func_reprobe) | reprobes;
+            value = 0;
+            value.resize(m_iStorageBits);
+
+            storeElement(iPosition, updkey, value);
 
             // overflow occurred!
             return true;
@@ -509,7 +516,10 @@ protected:
                     bool bOverflow = this->incrementElement(iPos, basekey, iReprobe, false);
 
                     if (bOverflow)
+                    {
                         handleOverflow(iPos, basekey, iReprobe);
+                    }
+
 
                     bInserted = true;
                     break;
@@ -555,8 +565,6 @@ protected:
     const uint32_t m_iStorageBits;
     const uint32_t m_iK;
     const uint32_t m_iKeyValBits;
-
-    const uint32_t m_iReprobeBits;
     const uint32_t m_iMaxReprobes;
 
     const UBigInt m_iMapSize;

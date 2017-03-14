@@ -40,15 +40,13 @@ int main(int argc, char *argv[])
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
-    TSXHashMap* pMap = new TSXHashMap(3, 6, 4);
+    TSXHashMap* pMap = new TSXHashMap(3, 4, 4);
 
     UBigInt oKmer1(0);
     UBigInt oKmer2(1);
 
     oKmer1.resize(8);
     oKmer2.resize(8);
-
-    TSX::print_kmer_t(oKmer1);
 
 
     /*
@@ -62,10 +60,13 @@ int main(int argc, char *argv[])
     pMap->addKmer( oKmer1 );
 */
 
-    for (size_t i = 0; i < 72; ++i)
+    for (size_t i = 0; i < 192*256; ++i)
     {
         std::cerr << "adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
         pMap->addKmer( oKmer1 );
+
+        std::cerr << "adding kmer: " << oKmer2.to_string() << " " << std::to_string(i) << std::endl;
+        pMap->addKmer( oKmer2 );
     }
 
 

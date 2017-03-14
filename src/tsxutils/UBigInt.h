@@ -499,9 +499,10 @@ public:
 
             uint32_t iDiff = m_iFieldSize-m_iBits;
 
-            uint64_t iField = m_pArray[0];
+            FIELDTYPE iField = m_pArray[0];
 
-            iField = (iField << iDiff) >> iDiff;
+            iField = (iField << iDiff);
+            iField = iField >> iDiff;
 
             return iField;
 
@@ -1119,7 +1120,7 @@ protected:
         // how many bits remain?
         if (iBitsRemaining > 0)
         {
-            FIELDTYPE  iThisVal = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+            FIELDTYPE  iThisVal = m_pArray[fields.quot] >> (m_iFieldSize-iBitsRemaining);
             FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
             iOldVal = iOldVal << iBitsRemaining;
 
