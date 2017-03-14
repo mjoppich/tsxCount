@@ -39,18 +39,33 @@ int main(int argc, char *argv[])
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
-    TSXHashMap* pMap = new TSXHashMap(12, 12, 8);
+    TSXHashMap* pMap = new TSXHashMap(3, 6, 4);
 
     UBigInt oKmer1(0);
     UBigInt oKmer2(1);
 
-    oKmer1.resize(16);
-    oKmer2.resize(16);
+    oKmer1.resize(8);
+    oKmer2.resize(8);
 
+    UBigInt oTest(3);
+    oTest.resize(6);
 
+    /*
+    oTest = ~oTest;
+    std::cerr << oTest.to_string() << std::endl;
+    std::cerr << (oTest == 0) << std::endl;
+*/
+/*
     pMap->addKmer( oKmer1 );
     pMap->addKmer( oKmer2 );
     pMap->addKmer( oKmer1 );
+*/
+
+    for (size_t i = 0; i < 72; ++i)
+    {
+        std::cerr << "adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
+        pMap->addKmer( oKmer1 );
+    }
 
 
     return 0;

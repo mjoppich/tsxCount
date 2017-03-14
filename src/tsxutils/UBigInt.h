@@ -16,6 +16,7 @@
 #include <iostream>
 #include <bitset>
 #include <tkPort.h>
+#include <stdlib.h>
 
 
 #ifndef BITSTOFIELDS
@@ -209,19 +210,23 @@ public:
       */
     UBigInt(uint64_t iBits, bool bZero)
     {
-
         initialize(iBits);
-
     }
 
     UBigInt(UBigInt & oOther )
-     : UBigInt(oOther.m_iBits, false)
+     : UBigInt(oOther.m_iBits, true)
+    {
+        copy_content(oOther);
+    }
+
+    UBigInt(UBigInt & oOther, uint32_t iBits )
+            : UBigInt(iBits, true)
     {
         copy_content(oOther);
     }
 
     UBigInt(const UBigInt & oOther )
-            : UBigInt(oOther.m_iBits, false)
+            : UBigInt(oOther.m_iBits, true)
     {
         copy_content(oOther);
     }
@@ -244,7 +249,6 @@ public:
         m_pArray = NULL;
 
         this->initialize(iBits);
-        m_iUnusedBitsMask = this->createUnusedBitsMask();
 
         if (pOldArray != NULL)
         {
@@ -267,11 +271,22 @@ public:
     }
 
     UBigInt(uint64_t iValue)
-    : UBigInt(64, true)
+    : UBigInt(0, true)
     {
 
-        this->copy_content_bits((FIELDTYPE*)&iValue, 0, 64);
+        uint32_t bits = UBigInt::log_2(iValue)+1;
+        this->initialize(bits);
 
+        this->copy_content_bits((FIELDTYPE*)&iValue, 0, bits);
+
+    }
+
+    static inline uint32_t log_2(const uint64_t x)
+    {
+        if(x == 0)
+            return 0;
+
+        return (63 - __builtin_clzll (x));
     }
 
     UBigInt& operator = (uint64_t iValue)
@@ -389,17 +404,21 @@ public:
     bool isEqual(const UBigInt* pLeft, const UBigInt* pRight, uint32_t iBits)
     {
         div_t procs = div(iBits, m_iFieldSize);
+        size_t checkIdx = 0;
 
-        for (size_t i = 0; i < procs.quot-1; ++i)
+        if (procs.quot > 0)
         {
-            if (pLeft->m_pArray[i] != pRight->m_pArray[i])
-                return false;
+            for (checkIdx = 0; checkIdx <= procs.quot-1; ++checkIdx)
+            {
+                if (pLeft->m_pArray[checkIdx] != pRight->m_pArray[checkIdx])
+                    return false;
+            }
         }
 
-        size_t iShift = procs.rem;
+        size_t iShift = m_iFieldSize - procs.rem;
 
-        FIELDTYPE thisRemain = pLeft->m_pArray[procs.quot-1] << iShift;
-        FIELDTYPE otherRemain = pRight->m_pArray[procs.quot-1] << iShift;
+        FIELDTYPE thisRemain = pLeft->m_pArray[checkIdx] << iShift;
+        FIELDTYPE otherRemain = pRight->m_pArray[checkIdx] << iShift;
 
         bool result = (thisRemain == otherRemain);
 
@@ -411,12 +430,12 @@ public:
 
         div_t procs = div(iOffsetBits, pElement->m_iFieldSize);
 
-        FIELDTYPE thisRemain = pElement->m_pArray[procs.quot-1] >> procs.rem;
+        FIELDTYPE thisRemain = pElement->m_pArray[procs.quot] >> procs.rem;
 
         if (thisRemain != 0)
             return false;
 
-        for (size_t i = procs.quot; i < pElement->m_iFields-1; ++i)
+        for (uint32_t i = procs.quot; i < pElement->m_iFields-1; ++i)
         {
 
             if (pElement->m_pArray[i] != 0)
@@ -424,10 +443,13 @@ public:
 
         }
 
-        FIELDTYPE value = pElement->m_pArray[pElement->m_iFields-1] << (pElement->m_iBits % m_iFieldSize);
+        if (pElement->m_iFields > 1)
+        {
+            FIELDTYPE value = pElement->m_pArray[pElement->m_iFields-1] & ~m_iUnusedBitsMask;
 
-        if (value != 0)
-            return false;
+            if (value != 0)
+                return false;
+        }
 
         return true;
 
@@ -650,6 +672,9 @@ protected:
     void initialize(uint32_t iBits)
     {
 
+        if (iBits == 0)
+            return;
+
         m_iBits = iBits;
         m_iFields = std::ceil( iBits / (8.0f*sizeof(FIELDTYPE)) );
 
@@ -665,16 +690,22 @@ protected:
 
     }
 
+    /**
+     *
+     * @return mask of bits in fieldtype that are unused (e.g. 11100000 if last 3 bits are unused)
+     */
     FIELDTYPE createUnusedBitsMask()
     {
-        FIELDTYPE iUnusedBitsMask = -1;
+        FIELDTYPE iUnusedBitsMask = 0;
 
-        uint64_t iRemainingBits = m_iFields * sizeof(FIELDTYPE) - m_iBits;
+        uint32_t iRemainingBits = m_iFields * sizeof(FIELDTYPE) * 8 - m_iBits;
 
-        if (iRemainingBits > 0)
-        {
-            m_iUnusedBitsMask -= ( (1 << (m_iFieldSize-iRemainingBits)) -1);
-        }
+        const uint32_t stop = m_iFieldSize - iRemainingBits;
+
+        for (uint32_t i = 0; i < stop; ++i)
+            iUnusedBitsMask = (iUnusedBitsMask << 1) | 1;
+
+        iUnusedBitsMask = ~iUnusedBitsMask;
 
         return iUnusedBitsMask;
     }
@@ -782,14 +813,29 @@ protected:
     void bitAnd(const UBigInt & oOther)
     {
         const FIELDTYPE* pOtherField = oOther.m_pArray;
-        this->applyToAllFields( [pOtherField] (FIELDTYPE iValue, uint64_t iField) {return (iValue & pOtherField[iField]);} );
+        const uint32_t iMaxField = oOther.m_iFields;
+
+        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
+
+            if (iField < iMaxField)
+                return (iValue & pOtherField[iField]);
+
+            return 0;
+        } );
+
     }
 
     void bitOr(const UBigInt & oOther)
     {
 
         const FIELDTYPE* pOtherField = oOther.m_pArray;
-        this->applyToAllFields( [pOtherField] (FIELDTYPE iValue, uint64_t iField) {return (iValue | pOtherField[iField]);} );
+        const uint32_t iMaxField = oOther.m_iFields;
+
+        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
+
+            return (iField < iMaxField) ? (iValue | pOtherField[iField]) : iValue;
+
+        } );
 
     }
 
@@ -797,13 +843,13 @@ protected:
     {
 
         const FIELDTYPE* pOtherField = oOther.m_pArray;
-        this->applyToAllFields( [pOtherField] (FIELDTYPE iValue, uint64_t iField) {return (iValue ^ pOtherField[iField]);} );
+        this->applyToAllFields( [pOtherField] (FIELDTYPE iValue, uint32_t iField) {return (iValue ^ pOtherField[iField]);} );
 
     }
 
-    void applyToAllFields(std::function<FIELDTYPE(FIELDTYPE, uint64_t)> oOp)
+    void applyToAllFields(std::function<FIELDTYPE(FIELDTYPE, uint32_t)> oOp)
     {
-        for (uint64_t i = 0; i < m_iFields; ++i)
+        for (uint32_t i = 0; i < m_iFields; ++i)
         {
             m_pArray[i] = oOp(m_pArray[i], i);
         }
@@ -812,9 +858,13 @@ protected:
     void sub(const UBigInt & oOther)
     {
 
+
+        uint32_t iBitsUsed = this->m_iBits;
+
         this->bitCompl();
         this->add(oOther);
         this->bitCompl();
+
 
     }
 
@@ -899,7 +949,7 @@ protected:
         FIELDTYPE iLastField = m_pArray[m_iFields-1];
 
         // 0b00vvvvvv & 0b00111111 --> 0b00vvvvvv -compl-> 0b11cccccc -&-> 0b00cccccc
-        iLastField = (~(iLastField & m_iUnusedBitsMask)) & m_iUnusedBitsMask;
+        iLastField = (~(iLastField & ~m_iUnusedBitsMask)) & ~m_iUnusedBitsMask;
 
         m_pArray[m_iFields-1] = iLastField;
 
@@ -1034,13 +1084,60 @@ protected:
 
     }
 
-    void copy_content_to_array(FIELDTYPE* pSrc, uint64_t iBitStart, uint64_t iBitCount)
+    /**
+     *
+     * @param pSrc destination array
+     * @param iBitStart offset in first field of pSrc
+     * @param iBitCount how many bits to copy
+     */
+    void copy_content_to_array(FIELDTYPE* pDest, uint32_t iBitStart, uint32_t iBitCount)
+    {
+
+        // how many bits can I copy into first, not fully occupied field?
+        uint8_t iOffset = iBitStart % m_iFieldSize;
+
+        // TODO copy first field
+        FIELDTYPE iThisVal = m_pArray[0] << iOffset;
+        FIELDTYPE iOldVal = pDest[0] << (m_iFieldSize - iOffset);
+        iOldVal = iOldVal >> (m_iFieldSize - iOffset);
+
+        pDest[0] = iThisVal | iOldVal;
+
+        // how many bits remain to be copied?
+        uint32_t iBitsRemaining = iBitCount - (m_iFieldSize - iOffset);
+        // how many full fields are this?
+        div_t fields = div(iBitsRemaining, m_iFieldSize);
+
+        // copy full fields over
+        for (uint32_t i = 0; i < fields.quot; ++i)
+        {
+            // TODO copy full fields
+            FIELDTYPE iThisVal = m_pArray[i] >> (m_iFieldSize-iOffset) | m_pArray[i+1] << iOffset;
+            pDest[i+1] = iThisVal;
+
+            iBitsRemaining -= m_iFieldSize;
+        }
+
+        // how many bits remain?
+        if (iBitsRemaining > 0)
+        {
+            FIELDTYPE  iThisVal = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+            FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
+            iOldVal = iOldVal << iBitsRemaining;
+
+            // TODO copy into last field
+            pDest[fields.quot+1] = iOldVal | iThisVal;
+        }
+
+    }
+
+    void copy_content_to_array_old(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
     {
 
         uint8_t iOffset = iBitStart % m_iFieldSize;
-        uint64_t iStartField = iBitStart / m_iFieldSize;
-        uint64_t iBitsRead = 0;
-        uint64_t iMaxField = (iBitStart + iBitCount) / m_iFieldSize;
+        uint32_t iStartField = iBitStart / m_iFieldSize;
+        uint32_t iBitsRead = 0;
+        uint32_t iMaxField = (iBitStart + iBitCount) / m_iFieldSize;
 
 
         if (iOffset == 0)
@@ -1070,19 +1167,23 @@ protected:
 
         } else {
 
-            // first field
+            // first field: length-offset high bits
             FIELDTYPE newval = m_pArray[iStartField] << iOffset;
-            FIELDTYPE oldval = (pSrc[iStartField] << iOffset) >> iOffset;
+
+            // old field: offset bits
+            FIELDTYPE oldval = pSrc[iStartField] << iOffset;
+            oldval = oldval >> iOffset;
+
             pSrc[iStartField] = newval | oldval;
 
             size_t iBitsDone = m_iFieldSize - iOffset;
-            for (size_t i = iStartField+1; i < iMaxField-1; ++i)
+            for (size_t i = iStartField; i < iMaxField-1; ++i)
             {
 
-                FIELDTYPE iValue = 0;
-                iValue |= (m_pArray[i+1] << (m_iFieldSize - iOffset) | (m_pArray[ i ] >> iOffset));
+                FIELDTYPE rem = m_pArray[i] >> (m_iFieldSize-iOffset);
+                rem = rem | (m_pArray[i+1] << iOffset);
 
-                pSrc[i] = iValue;
+                pSrc[i] = rem;
 
                 iBitsDone += 8;
             }
@@ -1091,12 +1192,17 @@ protected:
 
             if (iBitsRemaining > 0)
             {
-                FIELDTYPE  value = 0;
-                value = (pSrc[iMaxField] >> iBitsRemaining) << iBitsRemaining;
 
-                value |= (m_pArray[iMaxField] << (m_iFieldSize - iBitsRemaining)) >> (m_iFieldSize - iBitsRemaining);
+                FIELDTYPE rem = m_pArray[iMaxField-1] >> (m_iFieldSize-iOffset);
+                rem = rem | (m_pArray[iMaxField] << iOffset);
 
-                pSrc[iMaxField] = value;
+                rem = rem << m_iFieldSize-iBitsRemaining;
+                rem = rem >> m_iFieldSize-iBitsRemaining;
+
+                pSrc[iMaxField] = pSrc[iMaxField] << iBitsRemaining;
+                pSrc[iMaxField] = pSrc[iMaxField] >> iBitsRemaining;
+
+                pSrc[iMaxField] = pSrc[iMaxField] | rem;
             }
 
         }
@@ -1108,17 +1214,14 @@ protected:
      *
      * @brief copies x bits from another instance to this instance
      * @param pSrc the source field
-     * @param iBitStart bit start
+     * @param iBitStart start in pSrc field. Next bit will be first bit in this instance
      * @param iBitCount bitcount
      *
      */
-    void copy_content_bits(FIELDTYPE* pSrc, uint64_t iBitStart, uint64_t iBitCount)
+    void copy_content_bits(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
     {
 
         uint8_t iOffset = iBitStart % m_iFieldSize;
-        uint64_t iStartField = iBitStart / m_iFieldSize;
-        uint64_t iBitsRead = 0;
-        uint64_t iMaxField = (iBitStart + iBitCount) / m_iFieldSize;
 
         if (iOffset == 0)
         {
@@ -1127,42 +1230,29 @@ protected:
 
         } else {
 
+            uint32_t iRemainingBits = iBitCount;
+            div_t fields = div(iRemainingBits, m_iFieldSize);
 
-            for (uint64_t i = iStartField; i < iMaxField; ++i)
+            //
+            for (uint32_t i = 0;  i < fields.quot; ++i)
             {
-                FIELDTYPE iValue = 0;
 
-                iValue |= (pSrc[i+1] << (m_iFieldSize - iOffset) | (pSrc[ i ] >> iOffset));
+                FIELDTYPE iPartOne = pSrc[i] >> iOffset;
+                FIELDTYPE iPartTwo = pSrc[i+1] << (m_iFieldSize-iOffset);
 
-                m_pArray[i] = iValue;
+                m_pArray[i] = iPartOne | iPartTwo;
 
-                iBitsRead += m_iFieldSize;
-
-                if ( iBitCount - iBitsRead < m_iFieldSize)
-                {
-
-                    break;
-
-                }
-
+                iRemainingBits -= m_iFieldSize;
 
             }
 
-
-            uint8_t iBitsRemaining = iBitCount - iBitsRead;
-
-            if (iBitsRemaining < iOffset)
+            if (iRemainingBits > 0)
             {
-                FIELDTYPE iValue = 0;
 
-                iValue |= (pSrc[iMaxField] >> iBitsRemaining);
+                FIELDTYPE iPart = pSrc[fields.quot] >> iOffset;
 
-                m_pArray[iMaxField] = iValue;
-            } else {
-                FIELDTYPE iValue = 0;
+                m_pArray[fields.quot] = iPart & ~m_iUnusedBitsMask;
 
-                FIELDTYPE iMask = ~0 >> iBitsRemaining;
-                iValue |=  ((pSrc[iMaxField+1] << (m_iFieldSize - iOffset) | (pSrc[ iMaxField ] >> iOffset)) & iMask);
             }
 
         }
@@ -1177,7 +1267,8 @@ protected:
     void copy_content(const UBigInt & oOther)
     {
 
-        this->copy_content_bits(oOther.m_pArray, 0, this->m_iBits);
+        uint32_t iMinBits = std::min(oOther.m_iBits, this->m_iBits);
+        this->copy_content_bits(oOther.m_pArray, 0, iMinBits);
 
     }
 

@@ -207,9 +207,9 @@ protected:
 
             UBigInt oRes = pRows[i] & oValue; // was ^ for whatever reason? (XOR)
 
-            std::cerr << pRows[i].to_string() << std::endl;
-            std::cerr << oValue.to_string() << std::endl;
-            std::cerr << oRes.to_string() << std::endl;
+            //std::cerr << pRows[i].to_string() << std::endl;
+            //std::cerr << oValue.to_string() << std::endl;
+            //std::cerr << oRes.to_string() << std::endl;
 
             uint32_t iBitSum = oRes.sumBits();
 
