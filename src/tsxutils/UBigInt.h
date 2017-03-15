@@ -546,8 +546,8 @@ public:
 
         // return this & ((1 << iBitPos) -1)
 
-        UBigInt oRet(iBitPos-1, true);
-        oRet.copy_content_bits( this->m_pArray, 0, iBitPos-1);
+        UBigInt oRet(iBitPos, true);
+        oRet.copy_content_bits( this->m_pArray, 0, iBitPos);
         return oRet;
 
     }

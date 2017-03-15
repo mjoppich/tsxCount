@@ -36,32 +36,6 @@ using namespace TSX;
 class TSXHashMap {
 public:
 
-    std::string toBinStr(uint64_t val)
-    {
-        // mask has only the leftmost bit set.
-        uint64_t iShift = std::numeric_limits<uint64_t>::digits-1;
-        uint64_t mask = ((uint64_t)1) << (iShift) ;
-
-        // skip leading bits that are not set.
-        /*
-        while ( 0 == (val & mask) && mask != 0 )
-            mask >>= 1 ; // shift all bits to the right by 1
-            */
-
-        std::string binStr ;
-        binStr.reserve(std::numeric_limits<uint64_t>::digits+1) ;
-
-        do
-        {
-            // add a '1' or '0' depending the current bit.
-            uint8_t iVal = static_cast<char>(val & mask);
-            binStr += iVal + '0' ;
-
-        } while ( (mask>>=1) != 0 ) ; // next bit, when mask is 0 we've processed all bits
-
-        return binStr ;
-    }
-
     /**
      *
      * \param iExpLength the actual number of bins will be 2^iExpLength
@@ -147,10 +121,191 @@ public:
 
     bool addKmer(TSX::tsx_kmer_t& kmer)
     {
-        return this->insert_kmer(kmer);
+        bool bInserted = false;
+        TSX::tsx_reprobe_t iReprobe = 1;
+        iReprobe.resize( m_iL );
+
+        uint32_t iReprobes = 1;
+
+        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
+
+        std::cerr << "new iKmer " << kmer.to_string() << std::endl;
+        std::cerr << "new basekey " << basekey.to_string() << std::endl;
+
+
+        // TODO while !bInserted && iReprobe <
+        while ((!bInserted) && ( iReprobes < m_iMaxReprobes))
+        {
+
+            // get possible position
+            uint64_t iPos = this->getPosition( basekey, iReprobe);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (bEmpty)
+            {
+
+                TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
+                std::cerr << "key and inv " << key.to_string() << std::endl;
+                key = key | iReprobe;
+
+                this->incrementElement(iPos, key, iReprobe, false);
+
+                bInserted = true;
+                break;
+
+            } else {
+
+                bool bMatchesKey = positionMatchesKey(iPos, basekey, iReprobe);
+
+                if (bMatchesKey)
+                {
+
+                    bool bOverflow = this->incrementElement(iPos, basekey, iReprobe, false);
+
+                    if (bOverflow)
+                    {
+                        handleOverflow(iPos, basekey, iReprobe);
+                    }
+
+
+                    bInserted = true;
+                    break;
+
+                } else {
+                    iReprobe += 1;
+                    ++iReprobes;
+                    continue;
+                }
+
+
+            }
+
+
+        }
+
+        return bInserted;
+
+    }
+
+    UBigInt getKmerCount(TSX::tsx_kmer_t& kmer)
+    {
+        bool bFound = false;
+        TSX::tsx_reprobe_t iReprobe = 1;
+        iReprobe.resize( m_iL );
+
+        uint32_t iReprobes = 1;
+        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
+
+        UBigInt oResult(m_iStorageBits, true);
+
+        while ((!bFound) && ( iReprobes < m_iMaxReprobes))
+        {
+
+            // get possible position
+            uint64_t iPos = this->getPosition( basekey, iReprobe);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (!bEmpty)
+            {
+
+
+                TSX::tsx_keyval_t elem = this->getElement(iPos);
+                bool bMatchesKey = positionMatchesKey(iPos, basekey, iReprobe);
+
+                if (bMatchesKey)
+                {
+                    bFound = true;
+
+
+                    oResult = this->getValFromKeyVal(elem);
+
+                    // TODO find possible remaining entries!
+                    UBigInt oOverflows = findOverflowCounts(iPos, basekey, iReprobe);
+
+                    uint32_t iUsedOverflowBits = oOverflows.getBitCount();
+                    if (iUsedOverflowBits > 0)
+                    {
+                        oOverflows.resize( iUsedOverflowBits + m_iStorageBits );
+
+                        oOverflows = oOverflows << m_iStorageBits;
+                        oOverflows = oOverflows | oResult;
+
+                        oResult = oOverflows;
+                    }
+
+                }
+
+            }
+
+            iReprobe += 1;
+            ++iReprobes;
+
+
+        }
+
+        if (!bFound)
+        {
+            std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+        }
+
+        return oResult;
     }
 
 protected:
+
+    UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, TSX::tsx_reprobe_t iReprobe)
+    {
+        bool bHandled = false;
+        uint32_t iPerformedReprobes = 0;
+
+        UBigInt oReturn = 0;
+        uint32_t iAddedBits = 0;
+
+        while (iPerformedReprobes < m_iMaxReprobes)
+        {
+
+            iPerformedReprobes += 1;
+            iReprobe += 1;
+
+            // this fetches the element using the global reprobe!
+            uint64_t iPos = this->getPosition(basekey, iReprobe);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (!bEmpty)
+            {
+
+                // the reprobe part must match the number of reprobes back to the previous entry!
+                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes);
+
+                if (!bMatchesKey)
+                    continue;
+
+                TSX::tsx_keyval_t elem = this->getElement(iPos);
+
+                UBigInt posValue = this->getFuncValFromKeyVal(elem);
+
+                oReturn = (posValue << iAddedBits) | oReturn;
+
+                iAddedBits += 2*m_iK - m_iL + m_iStorageBits;
+
+                // reset performed reprobes as this should indicate number of reprobes needed!
+                // now we can try to find further matching positions :)
+                iPerformedReprobes = 0;
+
+            }
+
+        }
+
+        // no more matching position as max number of reprobes reached without finding a matching one
+        return oReturn;
+
+    }
 
     void printBinary(int x)
     {
@@ -162,15 +317,15 @@ protected:
         return i*(i+1)/2;
     }
 
-    inline uint64_t getPosition(TSX::tsx_kmer_t& iKmer, TSX::tsx_reprobe_t iReprobe)
+    inline uint64_t getPosition(TSX::tsx_key_t& hashedKey, TSX::tsx_reprobe_t iReprobe)
     {
 
         // Uk is still in range [0, 4^k -1]
-        TSX::tsx_kmer_t Uk = m_pHashingFunction->apply(iKmer) + iReprobe;
+        hashedKey = hashedKey + iReprobe;
 
-        std::cerr << "kmer key: " << Uk.to_string() << std::endl;
+        std::cerr << "kmer key: " << hashedKey.to_string() << std::endl;
 
-        UBigInt mod2 = Uk.mod2( m_iL );
+        UBigInt mod2 = hashedKey.mod2( m_iL );
 
         std::cerr << "kmer key % 2: " << mod2.to_string() << std::endl;
 
@@ -334,6 +489,18 @@ protected:
 
     }
 
+    TSX::tsx_func_t getFuncValFromKeyVal(TSX::tsx_keyval_t& keyval)
+    {
+
+        TSX::tsx_func_t ret = (keyval >> (m_iL + m_iStorageBits));
+        ret = ret << (m_iL + m_iStorageBits);
+        ret = ret | this->getValFromKeyVal(keyval);
+
+        ret.resize(2*m_iK-m_iL + m_iStorageBits);
+
+        return ret;
+    }
+
     TSX::tsx_func_t getFuncFromKeyVal(TSX::tsx_keyval_t& keyval)
     {
 
@@ -429,18 +596,19 @@ protected:
         }
     }
 
-    bool handleOverflow(uint64_t iPos, TSX::tsx_key_t& iKey, TSX::tsx_reprobe_t iReprobe)
+    bool handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, TSX::tsx_reprobe_t iReprobe)
     {
         bool bHandled = false;
-
-        iReprobe += 1;
-        uint32_t iPerformedReprobes = 1;
+        uint32_t iPerformedReprobes = 0;
 
         while (iPerformedReprobes < m_iMaxReprobes)
         {
 
-            ++iPerformedReprobes;
-            uint64_t iPos = this->getPosition(iKey, iReprobe);
+            iPerformedReprobes += 1;
+            iReprobe += 1;
+
+            // this fetches the element using the global reprobe!
+            uint64_t iPos = this->getPosition(basekey, iReprobe);
 
             // does this position match to key?
             bool bEmpty = positionEmpty(iPos);
@@ -448,20 +616,30 @@ protected:
             if (bEmpty)
             {
 
-                // there can not be an overflow ;)
-                this->incrementElement(iPos, iKey, iPerformedReprobes, true);
+                // the reprobe part must match the number of reprobes back to the previous entry!
+                this->incrementElement(iPos, basekey, iPerformedReprobes, true);
 
+                // there can not be an overflow ;)
                 return true;
 
             } else {
 
-                bool bMatchesKey = positionMatchesReprobe(iPos, iKey, iPerformedReprobes);
+                // the reprobe part must match the number of reprobes back to the previous entry!
+                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes);
 
-                bool bOverflow = this->incrementElement(iPos, iKey, iPerformedReprobes, true);
+                if (!bMatchesKey)
+                    continue;
+
+                bool bOverflow = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
 
                 if (!bOverflow)
                 {
+                    // no overflow occurred, we are all fine :)
                     return true;
+                } else {
+
+                    // reset performed reprobes as this should indicate number of reprobes needed!
+                    iPerformedReprobes = 0;
                 }
 
             }
@@ -469,70 +647,6 @@ protected:
         }
 
         return false;
-
-    }
-
-    bool insert_kmer(TSX::tsx_kmer_t& iKmer, uint8_t iCount = 1)
-    {
-
-        bool bInserted = false;
-        TSX::tsx_reprobe_t iReprobe = 1;
-        iReprobe.resize( m_iL );
-
-        TSX::tsx_key_t basekey = m_pHashingFunction->apply(iKmer);
-
-        std::cerr << "new iKmer " << iKmer.to_string() << std::endl;
-        std::cerr << "new basekey " << basekey.to_string() << std::endl;
-
-        while (!bInserted)
-        {
-
-            // get possible position
-            uint64_t iPos = this->getPosition(iKmer, iReprobe);
-
-            // does this position match to key?
-            bool bEmpty = positionEmpty(iPos);
-
-            if (bEmpty)
-            {
-
-                TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
-                std::cerr << "key and inv " << key.to_string() << std::endl;
-                key = key | iReprobe;
-                
-                this->incrementElement(iPos, key, iReprobe, false);
-
-                bInserted = true;
-                break;
-
-            } else {
-
-                bool bMatchesKey = positionMatchesKey(iPos, basekey, iReprobe);
-
-                if (bMatchesKey)
-                {
-
-                    bool bOverflow = this->incrementElement(iPos, basekey, iReprobe, false);
-
-                    if (bOverflow)
-                    {
-                        handleOverflow(iPos, basekey, iReprobe);
-                    }
-
-
-                    bInserted = true;
-                    break;
-
-                } else {
-                    iReprobe += 1;
-                    continue;
-                }
-
-
-            }
-
-
-        }
 
     }
 
