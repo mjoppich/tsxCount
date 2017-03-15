@@ -1120,7 +1120,9 @@ protected:
         // how many bits remain?
         if (iBitsRemaining > 0)
         {
-            FIELDTYPE  iThisVal = m_pArray[fields.quot] >> (m_iFieldSize-iBitsRemaining);
+            FIELDTYPE  iThisVal = m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
+            iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
+
             FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
             iOldVal = iOldVal << iBitsRemaining;
 
