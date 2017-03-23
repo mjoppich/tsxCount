@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
     pMap->addKmer( oKmer2 );
     pMap->addKmer( oKmer1 );
 */
-
-    for (size_t i = 0; i < 8*256; ++i)
+    size_t i;
+    for ( i = 0; i < 8*256; ++i)
     {
         std::cerr << "adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
         pMap->addKmer( oKmer1 );
@@ -69,9 +69,13 @@ int main(int argc, char *argv[])
         pMap->addKmer( oKmer2 );
     }
 
-    UBigInt oRes = pMap->getKmerCount(oKmer1);
+    UBigInt oRes1 = pMap->getKmerCount(oKmer1);
+    UBigInt oRes2 = pMap->getKmerCount(oKmer2);
 
-    std::cerr << oRes.to_string() << std::endl;
+    std::cerr << "Added each kmer: " << std::to_string(i) << std::endl;
+
+    std::cerr << "kmer: " << oKmer1.to_string() << ": " << oRes1.to_string() << " " << std::to_string(oRes1.toUInt()) << std::endl;
+    std::cerr << "kmer: " << oKmer2.to_string() << ": " << oRes2.to_string() << " " << std::to_string(oRes2.toUInt()) << std::endl;
 
     return 0;
 }

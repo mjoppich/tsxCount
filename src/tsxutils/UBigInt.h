@@ -241,6 +241,11 @@ public:
      */
     void resize(uint32_t iBits)
     {
+
+        // Nothing to be done?
+        if (iBits == m_iBits)
+            return;
+
         FIELDTYPE* pOldArray = m_pArray;
         uint32_t iOldBits = m_iBits;
 
@@ -267,6 +272,47 @@ public:
         }
 
     }
+    /**
+     *
+     * @param value
+     * @return big int with x bits and value copied
+     */
+    static UBigInt fromUint8(uint8_t value)
+    {
+        UBigInt oRet(8, true);
+        oRet.copy_content_to_array(&value, 0, 8);
+
+        return oRet;
+    }
+
+    /**
+     * TODO does this work?
+     *
+     * @param value
+     * @return
+     */
+    static UBigInt fromUint16(uint16_t value)
+    {
+        UBigInt oRet(8, true);
+        oRet.copy_content_to_array( (uint8_t*) &value, 0, 16);
+
+        return oRet;
+    }
+
+    /**
+ * TODO does this work?
+ *
+ * @param value
+ * @return
+ */
+    static UBigInt fromUint32(uint32_t value)
+    {
+        UBigInt oRet(8, true);
+        oRet.copy_content_to_array( (uint8_t*) &value, 0, 32);
+
+        return oRet;
+    }
+
 
     UBigInt(uint64_t iValue)
     : UBigInt(0, true)
@@ -516,7 +562,7 @@ public:
 
             for (uint8_t i = 0; i < iNeeded; ++i)
             {
-                std::cerr << std::bitset<8>(m_pArray[i]) << std::endl;
+                //std::cerr << std::bitset<8>(m_pArray[i]) << std::endl;
                 iReturn |= m_pArray[i] << (i*m_iFieldSize);
 
             }
