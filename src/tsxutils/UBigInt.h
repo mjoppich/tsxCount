@@ -141,6 +141,26 @@ public:
         return sBitSeq;
     }
 
+    std::string to_debug() const {
+        std::stringstream oSS;
+
+        uint32_t iBits = this->m_iFields * this->m_iFieldSize;
+
+        for (uint32_t i = 0; i < iBits; ++i)
+        {
+            uint8_t iValue = this->getBit(i);
+            oSS << (char) (48+iValue);
+            //std::cerr << (char) (48+iValue) << std::endl;
+        }
+
+
+        std::string sBitSeq = oSS.str();
+
+        std::reverse(sBitSeq.begin(), sBitSeq.end());
+
+        return sBitSeq;
+    }
+
     /**
      *
      * @param pPosition start position of array
@@ -199,6 +219,21 @@ public:
     {
 
     }
+
+    UBigInt(std::string sInput)
+    : UBigInt(sInput.size(), true)
+    {
+        for (size_t i = 0; i < sInput.size(); ++i)
+        {
+            size_t iIdx = sInput.size() - 1 -i;
+
+            this->setBit(i, sInput.at(iIdx) == '1' ? 1 : 0);
+        }
+
+        std::cerr << sInput << std::endl;
+        std::cerr << this->to_string() << std::endl;
+    }
+
 
     /** \brief UBigInt constructor
       * \param iBits number of bits required.
@@ -265,7 +300,9 @@ public:
                 m_pArray[i] = pOldArray[i];
             }
 
-            m_pArray[ fields.quot ] = (pOldArray[fields.quot] << (m_iFieldSize-fields.rem)) >> (m_iFieldSize-fields.rem);
+            FIELDTYPE oInter = (pOldArray[fields.quot] << (m_iFieldSize-fields.rem));
+
+            m_pArray[ fields.quot ] = oInter >> (m_iFieldSize-fields.rem);
 
             delete pOldArray;
 
@@ -299,19 +336,7 @@ public:
         return oRet;
     }
 
-    /**
- * TODO does this work?
- *
- * @param value
- * @return
- */
-    static UBigInt fromUint32(uint32_t value)
-    {
-        UBigInt oRet(8, true);
-        oRet.copy_content_to_array( (uint8_t*) &value, 0, 32);
 
-        return oRet;
-    }
 
 
     UBigInt(uint64_t iValue)
@@ -732,7 +757,6 @@ protected:
 
         m_iUnusedBitsMask = this->createUnusedBitsMask();
 
-
     }
 
     /**
@@ -783,7 +807,7 @@ protected:
     void shiftLeft( uint32_t iShift)
     {
 
-        if (iShift > m_iFieldSize)
+        if (iShift >= m_iFieldSize)
         {
 
             uint64_t iFields = iShift / m_iFieldSize;
@@ -822,7 +846,7 @@ protected:
     void shiftRight( uint32_t iShift)
     {
 
-        if (iShift > m_iFieldSize)
+        if (iShift >= m_iFieldSize)
         {
             uint64_t iFields = iShift / m_iFieldSize;
 
@@ -1035,7 +1059,8 @@ protected:
         if (fields.rem > 0)
         {
 
-            m_pArray[ fields.quot ] = (pSrc[fields.quot] << (m_iFieldSize-fields.rem)) >> (m_iFieldSize-fields.rem);
+            FIELDTYPE iPart = pSrc[fields.quot] << (m_iFieldSize-fields.rem);
+            m_pArray[ fields.quot ] = iPart >> (m_iFieldSize-fields.rem);
 
         }
 
@@ -1296,9 +1321,14 @@ protected:
             if (iRemainingBits > 0)
             {
 
-                FIELDTYPE iPart = pSrc[fields.quot] >> iOffset;
+                if (iOffset != m_iFieldSize-iRemainingBits)
+                    std::cerr << "offset " << std::to_string(iOffset) << " and field size-remain inqueal " << std::to_string(m_iFieldSize-iRemainingBits) << std::endl;
 
-                m_pArray[fields.quot] = iPart & ~m_iUnusedBitsMask;
+                FIELDTYPE iPart = pSrc[fields.quot] >> (m_iFieldSize-iRemainingBits);
+                iPart = iPart << (m_iFieldSize-iRemainingBits);
+                iPart = iPart >> iOffset;
+
+                m_pArray[fields.quot] = iPart;
 
             }
 

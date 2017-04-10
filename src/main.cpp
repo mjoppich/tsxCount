@@ -5,6 +5,24 @@
 #include <tsxcount/TSXHashMap.h>
 #include <tsxcount/TSXTypes.h>
 
+
+void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
+{
+
+    UBigInt oRes1 = pMap->getKmerCount(kmer);
+    uint32_t iKmer1Count = oRes1.toUInt();
+
+    if (iKmer1Count != iRefCount)
+    {
+        oRes1 = pMap->getKmerCount(kmer);
+        iKmer1Count = oRes1.toUInt();
+    }
+
+
+    std::cerr << "kmer: " << kmer.to_string() << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << std::endl;
+
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -40,13 +58,23 @@ int main(int argc, char *argv[])
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
-    TSXHashMap* pMap = new TSXHashMap(3, 4, 4);
+    uint32_t iK = 8;
+
+    TSXHashMap* pMap = new TSXHashMap(8, 4, iK);
+
+
+    UBigInt oTest ("110110010001");
+    std::cout << (oTest >> 7).to_string() << std::endl;
+
 
     UBigInt oKmer1(0);
     UBigInt oKmer2(1);
+    UBigInt oKmer3(178);
 
-    oKmer1.resize(8);
-    oKmer2.resize(8);
+    oKmer1.resize( 2*iK );
+    oKmer2.resize( 2*iK );
+    oKmer3.resize( 2*iK );
+
 
 
     /*
@@ -59,23 +87,35 @@ int main(int argc, char *argv[])
     pMap->addKmer( oKmer2 );
     pMap->addKmer( oKmer1 );
 */
+
+    const size_t iMaxCount = 2048*4;
+
     size_t i;
-    for ( i = 0; i < 8*256; ++i)
+    for ( i = 0; i < iMaxCount; ++i)
     {
         std::cerr << "adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
         pMap->addKmer( oKmer1 );
 
-        std::cerr << "adding kmer: " << oKmer2.to_string() << " " << std::to_string(i) << std::endl;
-        pMap->addKmer( oKmer2 );
+
+        if ((i % 2) == 0)
+        {
+            std::cerr << "adding kmer: " << oKmer2.to_string() << " " << std::to_string(i) << std::endl;
+            pMap->addKmer( oKmer2 );
+        }
+
+
+        if ((i % 4) == 0)
+        {
+            std::cerr << "adding kmer: " << oKmer3.to_string() << " " << std::to_string(i) << std::endl;
+            pMap->addKmer(oKmer3);
+        }
     }
 
-    UBigInt oRes1 = pMap->getKmerCount(oKmer1);
-    UBigInt oRes2 = pMap->getKmerCount(oKmer2);
 
-    std::cerr << "Added each kmer: " << std::to_string(i) << std::endl;
+    evaluate(pMap, oKmer1, iMaxCount);
+    evaluate(pMap, oKmer2, iMaxCount);
+    evaluate(pMap, oKmer3, iMaxCount);
 
-    std::cerr << "kmer: " << oKmer1.to_string() << ": " << oRes1.to_string() << " " << std::to_string(oRes1.toUInt()) << std::endl;
-    std::cerr << "kmer: " << oKmer2.to_string() << ": " << oRes2.to_string() << " " << std::to_string(oRes2.toUInt()) << std::endl;
 
     return 0;
 }

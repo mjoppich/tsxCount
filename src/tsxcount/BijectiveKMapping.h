@@ -213,12 +213,12 @@ protected:
 
             uint32_t iBitSum = oRes.sumBits();
 
-            if (iBitSum % 2)
-            {
-                oReturn.setBit(m_matN-1-i, 1);
-            }
+            oReturn.setBit(m_matN-1-i, iBitSum % 2);
+
 
         }
+
+        std::cerr << "aplyto: " << oReturn.to_string() << std::endl;
 
         return oReturn;
     }
