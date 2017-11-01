@@ -4,6 +4,8 @@
 
 #include <tsxcount/TSXHashMap.h>
 #include <tsxcount/TSXTypes.h>
+#include <utils/CLParser.h>
+#include <fastxutils/FastXReader.h>
 
 
 void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
@@ -18,14 +20,12 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
         iKmer1Count = oRes1.toUInt();
     }
 
-
     std::cerr << "kmer: " << kmer.to_string() << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << std::endl;
 
 }
 
-int main(int argc, char *argv[])
+void testHashMap()
 {
-
     UBigInt m_iKeyMask(128, true);
     uint64_t iBla = 0x8000000800000ULL;
     m_iKeyMask = UBigInt::createFromBitShift(128, 64);
@@ -115,6 +115,56 @@ int main(int argc, char *argv[])
     evaluate(pMap, oKmer1, iMaxCount);
     evaluate(pMap, oKmer2, iMaxCount);
     evaluate(pMap, oKmer3, iMaxCount);
+}
+
+std::vector<TSX::tsx_kmer_t> createKMers(std::string& sSequence, size_t iK)
+{
+    std::vector<TSX::tsx_kmer_t> oRetVec;
+
+    for (size_t i = 0; i < sSequence.length()-iK+1; ++i)
+    {
+        std::string sSubSeq = sSequence.substr(i, iK);
+        TSX::tsx_kmer_t oKmer = TSX::tsx_kmer_t::fromSequence(sSubSeq);
+        oRetVec.push_back(oKmer);
+    }
+
+    return oRetVec;
+
+}
+
+int main(int argc, char *argv[])
+{
+
+    CLParser oParser(argc, argv);
+
+    FASTXreader<FASTQEntry>* pReader = FASTXreader<FASTQEntry>::createFQReader(&oParser);
+    size_t iK = oParser.isSet("k") ? (size_t) oParser.getIntArgument((std::string&) "k") : 15;
+
+    TSXHashMap* pMap = new TSXHashMap(16, 6, iK);
+
+
+    while (pReader->hasNext())
+    {
+
+        std::vector<FASTQEntry> oEntries = pReader->readEntries(100);
+
+        for (size_t i = 0; i < oEntries.size(); ++i)
+        {
+            FASTQEntry* pEntry = &(oEntries.at(i));
+
+            std::string sSeq = pEntry->getSequence();
+            std::vector<TSX::tsx_kmer_t> allKmers = createKMers(sSeq, iK);
+
+            for (auto kmer : allKmers)
+            {
+                pMap->addKmer(kmer);
+            }
+
+        }
+
+
+    }
+
 
 
     return 0;

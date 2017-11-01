@@ -6,8 +6,9 @@
 #define TSXCOUNT_BIJECTIVEKMAPPING_H
 
 #include "IBijectiveFunction.h"
-#include <stdlib.h>
-#include <time.h>
+#include <cstdlib>
+#include <ctime>
+#include <cstring>
 
 class BijectiveKMapping;
 

@@ -46,8 +46,11 @@ if (MINGW)
 else()
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../Eigen/include)
-
+find_package( ZLIB REQUIRED )
+if ( ZLIB_FOUND )
+    include_directories( ${ZLIB_INCLUDE_DIRS} )
+    MESSAGE(WARNING ${ZLIB_LIBRARY})
+endif( ZLIB_FOUND )
 
 file(GLOB tsxcountlib_h
         "src/tsxcount/*.h"
@@ -65,20 +68,25 @@ install(FILES ${tsxcountlib_h} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include/)
 
 file(GLOB tsxutilslib_h
         "src/tsxutils/*.h"
+        "src/utils/*.h"
+        "src/fastxutils/*.h"
         )
 
 file(GLOB tsxutilslib_SRC
         "src/tsxutils/*.cpp"
-        "src/tsxutils/*.cpp"
+        "src/utils/*.cpp"
+        "src/fastxutils/*.cpp"
         )
 
-add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h} )
+add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h})
+TARGET_LINK_LIBRARIES(tsxutils z)
+
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 install(FILES ${tsxutilslib_h} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include/)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../splitter/include)
-ADD_LIBRARY(splitutils STATIC IMPORTED)
+ADD_LIBRARY(splitutils STATIC IMPORTED src/utils/CLParser.cpp src/utils/CLParser.h)
 SET_TARGET_PROPERTIES(splitutils PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../splitter/lib/libsplitutils.a)
 
 # Main app

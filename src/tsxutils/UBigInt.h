@@ -6,9 +6,12 @@
 #define TSXCOUNT_BIGINT_H
 
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+#include <cmath>
+
 #include <algorithm>
 #include <exception>
 #include <sstream>
@@ -208,6 +211,59 @@ public:
 
         UBigInt oIntermediate = UBigInt(iFieldsNeeded * this->m_iFieldSize, false);
         oIntermediate.copy_content_from_le((FIELDTYPE*) pMemPos, iBits);
+
+    }
+
+    static UBigInt fromSequence(std::string& seq)
+    {
+
+        UBigInt oRet(seq.length()*2, false);
+
+        for (size_t i = 0; i < seq.length(); ++i)
+        {
+
+            size_t iBitPos = i * 2;
+
+            switch (seq.at(i))
+            {
+                case 'A': // 0 00
+
+                    oRet.setBit(iBitPos, 0);
+                    oRet.setBit(iBitPos+1, 0);
+
+                    break;
+
+                case 'C': // 1 01
+
+                    oRet.setBit(iBitPos, 0);
+                    oRet.setBit(iBitPos+1, 1);
+
+                    break;
+
+                case 'G': // 2 10
+
+                    oRet.setBit(iBitPos, 1);
+                    oRet.setBit(iBitPos+1, 0);
+
+                    break;
+
+                case 'T': // 3 11
+                    oRet.setBit(iBitPos, 1);
+                    oRet.setBit(iBitPos+1, 1);
+                    break;
+
+                default: // random e.g. N
+
+                    uint8_t iBit1 = rand() % 2;
+                    uint8_t iBit2 = rand() % 2;
+
+                    oRet.setBit(iBitPos, iBit1);
+                    oRet.setBit(iBitPos+1, iBit2);
+
+                    break;
+            }
+        }
+
 
     }
 
