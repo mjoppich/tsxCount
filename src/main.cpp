@@ -6,6 +6,7 @@
 #include <tsxcount/TSXTypes.h>
 #include <utils/CLParser.h>
 #include <fastxutils/FastXReader.h>
+#include <utils/SequenceUtils.h>
 
 
 void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
@@ -124,7 +125,7 @@ std::vector<TSX::tsx_kmer_t> createKMers(std::string& sSequence, size_t iK)
     for (size_t i = 0; i < sSequence.length()-iK+1; ++i)
     {
         std::string sSubSeq = sSequence.substr(i, iK);
-        TSX::tsx_kmer_t oKmer = TSX::tsx_kmer_t::fromSequence(sSubSeq);
+        TSX::tsx_kmer_t oKmer = TSXSeqUtils::fromSequence(sSubSeq);
         oRetVec.push_back(oKmer);
     }
 
@@ -137,13 +138,19 @@ int main(int argc, char *argv[])
 
     CLParser oParser(argc, argv);
 
+    oParser.setArgument("k", std::to_string(10));
+    oParser.setArgument("fastq", "/mnt/c/ownCloud/data/heli_assemble/reads_tsx.fq");
+
     FASTXreader<FASTQEntry>* pReader = FASTXreader<FASTQEntry>::createFQReader(&oParser);
-    size_t iK = oParser.isSet("k") ? (size_t) oParser.getIntArgument((std::string&) "k") : 15;
+    size_t iK = oParser.isSet("k") ? (size_t) oParser.getIntArgument("k") : 15;
 
     TSXHashMap* pMap = new TSXHashMap(16, 6, iK);
 
+    pMap->testHashFunction();
 
-    while (pReader->hasNext())
+    bool exitNow = false;
+
+    while (pReader->hasNext() and !exitNow)
     {
 
         std::vector<FASTQEntry> oEntries = pReader->readEntries(100);
@@ -158,12 +165,24 @@ int main(int argc, char *argv[])
             for (auto kmer : allKmers)
             {
                 pMap->addKmer(kmer);
+
+                exitNow=false;
             }
 
         }
 
 
     }
+
+    std::vector<TSX::tsx_kmer_t> allKmers = pMap->getAllKmers();
+
+    for (auto kmer : allKmers)
+    {
+        UBigInt oCount = pMap->getKmerCount(kmer);
+        std::cout << kmer.to_string() << "\t" << TSXSeqUtils::toSequence(kmer) << "\t" << oCount.toUInt() << std::endl;
+    }
+
+    std::cout << "Printed " << allKmers.size() << " kmers" << std::endl;
 
 
 

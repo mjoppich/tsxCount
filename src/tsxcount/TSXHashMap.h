@@ -5,8 +5,9 @@
 #ifndef TSXCOUNT_TSXHASHMAP_H
 #define TSXCOUNT_TSXHASHMAP_H
 
-#include <inttypes.h>
-#include <stdint.h>
+#include <cinttypes>
+#include <cstdint>
+#include <cstdlib>
 #include <cmath>
 #include <cstdlib>
 #include "IBijectiveFunction.h"
@@ -15,10 +16,34 @@
 
 #include <iostream>
 #include <bitset>
+#include <stdlib.h>
+#include <vector>
+#include <set>
 
 using namespace TSX;
 
 
+
+class TSXException: public std::exception
+{
+public:
+    TSXException(std::string sText)
+            : std::exception(), m_sText(sText)
+    {
+    }
+
+
+    virtual const char* what() const throw()
+    {
+        return m_sText.c_str();
+    }
+
+
+protected:
+
+    const std::string m_sText;
+
+};
 
 /**
  * \class TSXHashMap
@@ -38,9 +63,10 @@ public:
 
     /**
      *
-     * \param iExpLength the actual number of bins will be 2^iExpLength
-     * \param iStorage the bits used for each value
+     * \param iL the actual number of bins will be 2^iExpLength
+     * \param iStorageBits the bits used for each value
      * \param iK the actual K to measure
+     * \note 2*iK > m_iL
      *
      */
     TSXHashMap(uint8_t iL, uint32_t iStorageBits, uint16_t iK)
@@ -55,7 +81,7 @@ public:
 
         if (2 * m_iK <= m_iL)
         {
-            throw "Invalid lengths for hashmap size and value of k";
+            throw TSXException("Invalid lengths for hashmap size and value of k");
         }
 
         size_t iElements = std::pow(2, m_iL);
@@ -79,24 +105,20 @@ public:
         m_mask_reprobe_func = UBigInt(2*m_iK, true);
         m_mask_reprobe_func.setBit(m_iL, 1);
 
-        std::cerr << m_mask_reprobe_func.to_string() << std::endl;
         m_mask_reprobe_func = m_mask_reprobe_func-1;
-        std::cerr << m_mask_reprobe_func.to_string() << std::endl;
-
-
         m_mask_func_reprobe = ~m_mask_reprobe_func;
 
 
-        std::cerr << "Value Mask (value = 1)" << std::endl;
+        std::cerr << "Value Mask (value = 1) m_mask_value_key" << std::endl;
         std::cerr << m_mask_value_key.to_string() << std::endl;
 
-        std::cerr << "Key Mask (key = 1)" << std::endl;
+        std::cerr << "Key Mask (key = 1) m_mask_key_value" << std::endl;
         std::cerr << m_mask_key_value.to_string() << std::endl;
 
-        std::cerr << "Reprobe Mask (reprobe = 1)" << std::endl;
+        std::cerr << "Reprobe Mask (reprobe = 1) m_mask_reprobe_func" << std::endl;
         std::cerr << m_mask_reprobe_func.to_string() << std::endl;
 
-        std::cerr << "Func Mask (func = 1)" << std::endl;
+        std::cerr << "Func Mask (func = 1) m_mask_func_reprobe" << std::endl;
         std::cerr << m_mask_func_reprobe.to_string() << std::endl;
 
 
@@ -117,8 +139,15 @@ public:
         uint32_t iReprobes = 1;
         TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
 
-        //std::cerr << "new iKmer " << kmer.to_string() << std::endl;
-        //std::cerr << "new basekey " << basekey.to_string() << std::endl;
+        /*
+         *
+        UBigInt test = m_pHashingFunction->inv_apply(basekey);
+
+        std::cerr << "new iKmer " << kmer.to_string() << std::endl;
+        std::cerr << "new basekey " << basekey.to_string() << std::endl;
+        std::cerr << "old kmer " << test.to_string() << std::endl;
+        */
+
 
         while ( iReprobes < m_iMaxReprobes )
         {
@@ -135,12 +164,16 @@ public:
                 TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
                 //std::cerr << "key and inv " << key.to_string() << std::endl;
 
-                std::cerr << "New field: " << std::to_string(iPos) << " FOR KMER " << kmer.to_string() << " with reprobes " << std::to_string(iReprobes) << " and basekey " << basekey.to_string() << std::endl;
+
+                TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
+
+                //std::cerr << "addkmer New field: " << std::to_string(iPos) << " FOR KMER " << kmer.to_string() << " with reprobes " << std::to_string(iReprobes) << " and basekey " << basekey.to_string() << " and key " << updkey.to_string() << std::endl;
 
                 this->incrementElement(iPos, key, iReprobes, false);
 
                 // so we can find kmers later without knowing the kmer
                 m_iKmerStarts.setBit(iPos, 1);
+                m_setUsedPositions.insert(iPos);
 
                 bInserted = true;
                 break;
@@ -180,7 +213,17 @@ public:
 
         if (!bInserted)
         {
+           uint32_t maxPositions = 1 << m_iL;
+
             std::cerr << "Could not insert kmer " << kmer.to_string()<< std::endl;
+            std::cerr << "Used fields: " << m_setUsedPositions.size() << std::endl;
+            std::cerr << "Available fields: " << std::pow(2.0, m_iL) << std::endl;
+            std::cerr << "k=" << m_iK << " l=" << (uint32_t) m_iL << " entry (key+value) bits=" << m_iKeyValBits << " storage bits=" << m_iStorageBits << std::endl;
+
+            if (m_setUsedPositions.size() == maxPositions)
+            {
+                exit(42);
+            }
 
             this->addKmer(kmer);
         }
@@ -251,6 +294,83 @@ public:
         }
 
         return oResult;
+    }
+
+    std::vector<TSX::tsx_kmer_t> getAllKmers()
+    {
+
+        std::vector<TSX::tsx_kmer_t> oKmers;
+
+        for (uint64_t i = 0; i < m_iKmerStarts.getBitCount(); ++i)
+        {
+
+            uint8_t iKmerStarts = m_iKmerStarts.getBit(i);
+
+            bool isStart = m_setUsedPositions.find(i) != m_setUsedPositions.end();
+
+            if (!iKmerStarts)
+                continue;
+
+            //std::cerr << "Position: " << i << std::endl;
+
+            TSX::tsx_keyval_t oKeyVal = this->getElement(i);
+            //std::cerr << "KeyVal: " << oKeyVal.to_string() << std::endl;
+
+            TSX::tsx_key_t oKey = this->getKeyFromKeyVal(oKeyVal);
+            //std::cerr << "Key: " << oKey.to_string() << std::endl;
+
+            TSX::tsx_reprobe_t oReprobe = this->getReprobeFromKey(oKey);
+            uint64_t iReprobeLength = oReprobe.getBitCount();
+
+            uint64_t iReprobe = oReprobe.toUInt();
+            oReprobe = this->reprobe(iReprobe);
+
+
+            UBigInt oMissingPart = UBigInt(i);
+            oMissingPart.resize(iReprobeLength);
+
+            //std::cerr << "Position: " << oMissingPart.to_string() << std::endl;
+            //std::cerr << "Reprobe: " << oReprobe.to_string() << std::endl;
+
+            oMissingPart = oMissingPart-oReprobe;
+
+            //std::cerr << "pos-reprobe: " << oMissingPart.to_string() << std::endl;
+
+            oMissingPart = oMissingPart.mod2(m_iL);
+            oMissingPart.resize(m_iL);
+
+            //std::cerr << "Missing: " << oMissingPart.to_string() << " " << oMissingPart.getBitCount() << std::endl;
+            //std::cerr << "Key: " << oKey.to_string() << " " << oKey.getBitCount() << std::endl;
+
+
+            UBigInt oHKmer = oKey & ~m_mask_reprobe_func;
+            oHKmer = oHKmer | oMissingPart;
+
+            //std::cerr << "HKmer: " << oHKmer.to_string() << " " << oHKmer.getBitCount() << std::endl;
+
+            TSX::tsx_kmer_t oKmer = this->m_pHashingFunction->inv_apply(oHKmer);
+
+            //std::cerr << "Kmer: " << oKmer.to_string() << std::endl;
+
+            oKmers.push_back(oKmer);
+
+        }
+
+        return oKmers;
+
+    }
+
+    void testHashFunction() {
+
+        UBigInt oTest = UBigInt::fromString("11001001000000001011");
+
+        TSX::tsx_key_t oKey = m_pHashingFunction->apply(oTest);
+        UBigInt oInvKey = m_pHashingFunction->inv_apply(oKey);
+
+        std::cout << oTest.to_string() << std::endl;
+        std::cout << oInvKey.to_string() << std::endl;
+
+        std::cout << std::endl;
     }
 
 protected:
@@ -340,7 +460,6 @@ protected:
 
         TSX::tsx_key_t oRet = (basekey & m_mask_func_reprobe) | reprobe;
         oRet.resize(2*m_iK);
-
         return oRet;
 
     }
@@ -425,6 +544,18 @@ protected:
         return element == 0;
     }
 
+    inline std::div_t udiv(uint32_t a, uint32_t b)
+    {
+
+        std::div_t ret;
+
+        ret.quot = a / b;
+        ret.rem = a % b;
+
+        return ret;
+    }
+
+
     /**
      *
      * @param pos
@@ -438,7 +569,9 @@ protected:
 
         // we want to get the iPosition-th entry
         uint32_t iBitsPerField = sizeof(uint8_t) * 8;
-        std::div_t oStartPos = div( pos*m_iKeyValBits, iBitsPerField);
+        uint32_t iDivPos = pos * m_iKeyValBits;
+
+        std::div_t oStartPos = udiv( iDivPos, iBitsPerField);
 
         //UBigInt oReturn(m_iKeyValBits);
         UBigInt oReturn = UBigInt::createFromMemory(m_pCounterArray, oStartPos.quot, oStartPos.rem, m_iKeyValBits);
@@ -463,7 +596,7 @@ protected:
 
         // we want to get the iPosition-th entry
         uint32_t iBitsPerField = sizeof(uint8_t) * 8;
-        std::div_t oStartPos = div( pos*m_iKeyValBits, iBitsPerField);
+        std::div_t oStartPos = udiv( pos*m_iKeyValBits, iBitsPerField);
         oKeyVal.resize(m_iKeyValBits);
 
         //UBigInt oReturn(m_iKeyValBits);
@@ -481,8 +614,7 @@ protected:
             oStoredKeyVal = this->getElement(pos);
         }
 
-        std::cerr << "keyval stored: " << oKeyVal.to_string() << " into array " << std::to_string(iArray) << " in pos " << std::to_string(pos);
-        std::cerr << std::endl;
+        //std::cerr << "keyval stored: " << oKeyVal.to_string() << " into array " << std::to_string(iArray) << " in pos " << std::to_string(pos) << std::endl;
 
     }
 
@@ -742,6 +874,8 @@ protected:
     UBigInt m_iKmerStarts;
 
     IBijectiveFunction* m_pHashingFunction;
+
+    std::set<uint64_t> m_setUsedPositions;
 
 
 };

@@ -184,7 +184,7 @@ public:
 
         std::string sGZ = ".gz";
 
-        if ( sGZ.rfind(".gz") == sGZ.length()-3 )
+        if ( pFileName->rfind( sGZ ) == pFileName->length()-3 )
         {
             m_bZLIBMode = true;
         }

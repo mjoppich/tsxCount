@@ -10,6 +10,28 @@
 #include <iostream>
 #include "Utils.h"
 
+
+class CLParserException: public std::exception
+{
+public:
+    CLParserException(std::string sText)
+            : std::exception(), m_sText(sText)
+    {
+    }
+
+
+    virtual const char* what() const throw()
+    {
+        return m_sText.c_str();
+    }
+
+
+protected:
+
+    const std::string m_sText;
+
+};
+
 class CLParser {
 public:
     CLParser(std::string sArgs);
@@ -27,7 +49,7 @@ public:
 
         if (oIt == m_pCLArguments->end())
         {
-            return NULL;
+            throw new CLParserException("Does not have argument: " + sArg);
         }
 
 
@@ -68,6 +90,11 @@ public:
         return true;
     }
 
+    void setArgument(std::string skey, std::string sval)
+    {
+        m_pCLArguments->insert(std::pair<std::string, std::string*>( skey, new std::string(sval) ));
+    }
+
     void printAllArguments()
     {
 
@@ -81,7 +108,7 @@ public:
 
     }
 
-    int getIntArgument(std::string &arg)
+    int getIntArgument(std::string arg)
     {
         std::string argval = this->getArgumentByValue(arg);
 

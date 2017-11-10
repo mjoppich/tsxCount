@@ -219,8 +219,6 @@ protected:
 
         }
 
-        std::cerr << "aplyto: " << oReturn.to_string() << std::endl;
-
         return oReturn;
     }
 

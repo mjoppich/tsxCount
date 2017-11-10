@@ -18,6 +18,7 @@
 #include <functional>
 #include <iostream>
 #include <bitset>
+#include <stdlib.h>
 
 
 #ifndef BITSTOFIELDS
@@ -211,59 +212,6 @@ public:
 
         UBigInt oIntermediate = UBigInt(iFieldsNeeded * this->m_iFieldSize, false);
         oIntermediate.copy_content_from_le((FIELDTYPE*) pMemPos, iBits);
-
-    }
-
-    static UBigInt fromSequence(std::string& seq)
-    {
-
-        UBigInt oRet(seq.length()*2, false);
-
-        for (size_t i = 0; i < seq.length(); ++i)
-        {
-
-            size_t iBitPos = i * 2;
-
-            switch (seq.at(i))
-            {
-                case 'A': // 0 00
-
-                    oRet.setBit(iBitPos, 0);
-                    oRet.setBit(iBitPos+1, 0);
-
-                    break;
-
-                case 'C': // 1 01
-
-                    oRet.setBit(iBitPos, 0);
-                    oRet.setBit(iBitPos+1, 1);
-
-                    break;
-
-                case 'G': // 2 10
-
-                    oRet.setBit(iBitPos, 1);
-                    oRet.setBit(iBitPos+1, 0);
-
-                    break;
-
-                case 'T': // 3 11
-                    oRet.setBit(iBitPos, 1);
-                    oRet.setBit(iBitPos+1, 1);
-                    break;
-
-                default: // random e.g. N
-
-                    uint8_t iBit1 = rand() % 2;
-                    uint8_t iBit2 = rand() % 2;
-
-                    oRet.setBit(iBitPos, iBit1);
-                    oRet.setBit(iBitPos+1, iBit2);
-
-                    break;
-            }
-        }
-
 
     }
 
@@ -781,6 +729,28 @@ public:
 
     }
 
+    static UBigInt fromString(std::string sInput) {
+
+        UBigInt oBigInt(sInput.size(), true);
+
+        for (size_t i = 0; i < sInput.size(); ++i)
+        {
+            size_t iBitPos = sInput.size()-1-i;
+
+            if (sInput.at(i) == '1')
+            {
+                oBigInt.setBit(iBitPos, 1);
+            } else {
+                oBigInt.setBit(iBitPos, 0);
+            }
+
+        }
+
+        return oBigInt;
+
+    }
+
+
 protected:
 
     /**
@@ -1229,26 +1199,102 @@ protected:
 
         pDest[0] = iThisVal | iOldVal;
 
+        //std::cout<<std::bitset<8>(pDest[0])<< " into field " << 0 << " " << static_cast<void*>(pDest) << std::endl;
+
+
         // how many bits remain to be copied?
         uint32_t iBitsRemaining = iBitCount - (m_iFieldSize - iOffset);
         // how many full fields are this?
         div_t fields = div(iBitsRemaining, m_iFieldSize);
 
         // copy full fields over
-        for (uint32_t i = 0; i < fields.quot; ++i)
+        uint32_t i = 0;
+        for ( i = 0; i < fields.quot; ++i)
         {
             // TODO copy full fields
-            FIELDTYPE iThisVal = m_pArray[i] >> (m_iFieldSize-iOffset) | m_pArray[i+1] << iOffset;
+
+            FIELDTYPE iPartRight = m_pArray[i] >> (m_iFieldSize-iOffset);
+            FIELDTYPE iPartLeft = m_pArray[i+1] << iOffset;
+
+            FIELDTYPE iThisVal = iPartLeft | iPartRight;
+
             pDest[i+1] = iThisVal;
+
+
 
             iBitsRemaining -= m_iFieldSize;
         }
 
+        if (iBitsRemaining > 0)
+        {
+
+
+            if (iBitsRemaining <= iOffset)
+            {
+
+                // we do not need a rest from the next field
+                FIELDTYPE iPartRight = m_pArray[fields.quot] << (m_iFieldSize-iOffset);
+                iPartRight = iPartRight << (iOffset-iBitsRemaining);
+                iPartRight = iPartRight >> (iOffset-iBitsRemaining);
+                iPartRight = iPartRight >> m_iFieldSize-iOffset;
+
+                FIELDTYPE iOldValue = pDest[fields.quot+1];
+                iOldValue = iOldValue >> iBitsRemaining;
+                iOldValue = iOldValue << iBitsRemaining;
+
+                pDest[fields.quot+1] = iOldValue | iPartRight;
+
+            } else {
+
+                // we need a rest from the next field
+                FIELDTYPE iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+
+                uint32_t iRemaining = iBitsRemaining - iOffset;
+
+                // need the rightmost iRemaining bits
+                FIELDTYPE iPartLeft = m_pArray[fields.quot+1] << (m_iFieldSize-iRemaining); // clears all but iRemaining bits
+                iPartLeft = iPartLeft >> (m_iFieldSize-iRemaining);
+                iPartLeft = iPartLeft << iOffset;
+
+                FIELDTYPE iFieldValue = iPartLeft | iPartRight;
+
+                FIELDTYPE iOldValue = pDest[fields.quot+1];
+                iOldValue = iOldValue >> iBitsRemaining;
+                iOldValue = iOldValue << iBitsRemaining;
+
+                pDest[fields.quot+1] = iOldValue | iFieldValue;
+
+            }
+
+
+            /*
+            std::cout << "Having i: " << i << " and fields " << fields.quot << std::endl;
+            std::cout << "Using the last bits: " << iBitsRemaining << std::endl;
+            std::cout<< std::bitset<8>(pDest[fields.quot+1]) << " into field " << fields.quot+1 << " " << static_cast<void*>(pDest + fields.quot+1) << std::endl;
+            */
+
+        }
+
+/*
         // how many bits remain?
         if (iBitsRemaining > 0)
         {
-            FIELDTYPE  iThisVal = m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
+
+            FIELDTYPE iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+
+            iBitsRemaining -= iOffset;
+
+            FIELDTYPE iThisVal = 0;
+            iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
             iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
+
+            if (this->m_iFields < fields.quot+1)
+            {
+                iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining); // TODO can this field value exist?
+            }
+
+            //FIELDTYPE  iThisVal = m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
+            //iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
 
             FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
             iOldVal = iOldVal << iBitsRemaining;
@@ -1256,7 +1302,7 @@ protected:
             // TODO copy into last field
             pDest[fields.quot+1] = iOldVal | iThisVal;
         }
-
+*/
     }
 
     void copy_content_to_array_old(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
@@ -1368,6 +1414,14 @@ protected:
                 FIELDTYPE iPartOne = pSrc[i] >> iOffset;
                 FIELDTYPE iPartTwo = pSrc[i+1] << (m_iFieldSize-iOffset);
 
+                FIELDTYPE iFieldValue = iPartOne | iPartTwo;
+
+                /*
+                std::cout << "i   " << std::bitset<8>(pSrc[i]) << " " << static_cast<void*>(pSrc + i) << std::endl;
+                std::cout << "i+1 " << std::bitset<8>(pSrc[i+1]) << " " << static_cast<void*>(pSrc + i+1) << std::endl;
+                std::cout<<std::bitset<8>(iFieldValue)<< " from field " << i << " " << static_cast<void*>(pSrc + i) << std::endl;
+                 */
+
                 m_pArray[i] = iPartOne | iPartTwo;
 
                 iRemainingBits -= m_iFieldSize;
@@ -1376,13 +1430,22 @@ protected:
 
             if (iRemainingBits > 0)
             {
+                uint8_t iUnusedBits = (iBitStart+iBitCount) % m_iFieldSize;
+                uint8_t iMissingBits = iBitCount % m_iFieldSize;
 
-                if (iOffset != m_iFieldSize-iRemainingBits)
+                if (iMissingBits != iRemainingBits)
                     std::cerr << "offset " << std::to_string(iOffset) << " and field size-remain inqueal " << std::to_string(m_iFieldSize-iRemainingBits) << std::endl;
 
-                FIELDTYPE iPart = pSrc[fields.quot] >> (m_iFieldSize-iRemainingBits);
-                iPart = iPart << (m_iFieldSize-iRemainingBits);
+                FIELDTYPE iPart = pSrc[fields.quot];
+
+                iPart = iPart << m_iFieldSize-iOffset-iRemainingBits;
+                iPart = iPart >> m_iFieldSize-iOffset-iRemainingBits;
+
                 iPart = iPart >> iOffset;
+
+                //FIELDTYPE iPart = pSrc[fields.quot] >> (m_iFieldSize-iRemainingBits);
+                //iPart = iPart << (m_iFieldSize-iRemainingBits);
+                //iPart = iPart >> iOffset;
 
                 m_pArray[fields.quot] = iPart;
 
