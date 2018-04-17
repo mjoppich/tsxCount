@@ -30,6 +30,9 @@ if (OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} ")
 endif()
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 MESSAGE(WARNING ${CMAKE_SYSTEM_NAME})
 
 if ( CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CYGWIN OR MINGW)
@@ -79,7 +82,7 @@ file(GLOB tsxutilslib_SRC
         )
 
 add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h})
-TARGET_LINK_LIBRARIES(tsxutils z)
+TARGET_LINK_LIBRARIES(tsxutils z Threads::Threads)
 
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)
@@ -99,5 +102,5 @@ file(GLOB tsxCount_SRC
         )
 ADD_EXECUTABLE(tsxCount ${tsxCount_SRC} ${tsxCount_H})
 target_include_directories(tsxCount PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils)
+TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils Threads::Threads)
 install(TARGETS tsxCount DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)

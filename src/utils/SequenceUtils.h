@@ -65,7 +65,7 @@ namespace TSXSeqUtils {
                 case 3: sRetSeq[i] = 'T'; break;
 
                 default: sRetSeq[i] = 'N'; break;
-                    
+
             }
 
         }

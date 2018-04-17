@@ -174,12 +174,22 @@ int main(int argc, char *argv[])
 
     }
 
+    std::cout << "Added a total of " << pMap->getKmerCount() << " different kmers" << std::endl;
+
     std::vector<TSX::tsx_kmer_t> allKmers = pMap->getAllKmers();
 
-    for (auto kmer : allKmers)
+#pragma omp parallel for
+    for (size_t i=0; i < allKmers.size(); ++i)
     {
+
+        TSX::tsx_kmer_t& kmer = allKmers.at(i);
+
         UBigInt oCount = pMap->getKmerCount(kmer);
+
+#pragma omp critical
+        {
         std::cout << kmer.to_string() << "\t" << TSXSeqUtils::toSequence(kmer) << "\t" << oCount.toUInt() << std::endl;
+        }
     }
 
     std::cout << "Printed " << allKmers.size() << " kmers" << std::endl;

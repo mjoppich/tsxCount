@@ -126,7 +126,7 @@ public:
 
     }
 
-    ~TSXHashMap()
+    virtual ~TSXHashMap()
     {
         delete m_pHashingFunction;
         free(m_pCounterArray);
@@ -138,16 +138,6 @@ public:
 
         uint32_t iReprobes = 1;
         TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
-
-        /*
-         *
-        UBigInt test = m_pHashingFunction->inv_apply(basekey);
-
-        std::cerr << "new iKmer " << kmer.to_string() << std::endl;
-        std::cerr << "new basekey " << basekey.to_string() << std::endl;
-        std::cerr << "old kmer " << test.to_string() << std::endl;
-        */
-
 
         while ( iReprobes < m_iMaxReprobes )
         {
@@ -162,17 +152,13 @@ public:
             {
 
                 TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
-                //std::cerr << "key and inv " << key.to_string() << std::endl;
-
-
                 TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
-
-                //std::cerr << "addkmer New field: " << std::to_string(iPos) << " FOR KMER " << kmer.to_string() << " with reprobes " << std::to_string(iReprobes) << " and basekey " << basekey.to_string() << " and key " << updkey.to_string() << std::endl;
 
                 this->incrementElement(iPos, key, iReprobes, false);
 
-                // so we can find kmers later without knowing the kmer
+                // so we can find kmer start positions later without knowing the kmer
                 m_iKmerStarts.setBit(iPos, 1);
+                // TODO this slows down inserting, but is a nice measure ifdef out verbose?
                 m_setUsedPositions.insert(iPos);
 
                 bInserted = true;
@@ -180,10 +166,18 @@ public:
 
             } else {
 
-                bool bIsOtherKmerStart = m_iKmerStarts.getBit(iPos) == 1;
-                bool bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
+                // TODO where is the case kmer starts multiple positions later handled?
+                bool bIsKmerStart = m_iKmerStarts.getBit(iPos) == 1;
+                bool bMatchesKey;// = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
 
-                if ((bIsOtherKmerStart) && (bMatchesKey))
+                if (bIsKmerStart)
+                {
+                    bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
+                } else {
+                    bMatchesKey = false;
+                }
+
+                if ((bIsKmerStart) && (bMatchesKey))
                 {
 
                     bool bOverflow = this->incrementElement(iPos, basekey, iReprobes, false);
@@ -281,6 +275,10 @@ public:
 
                 }
 
+            } else {
+
+                // why would the insertion skip an empty place?
+                break;
             }
 
             ++iReprobes;
@@ -294,6 +292,11 @@ public:
         }
 
         return oResult;
+    }
+
+    uint64_t getKmerCount()
+    {
+        return this->m_iKmerStarts.sumBits();
     }
 
     std::vector<TSX::tsx_kmer_t> getAllKmers()
@@ -588,11 +591,8 @@ protected:
         TSX::tsx_keyval_t oKeyVal(key, 2*m_iK + m_iStorageBits);
         oKeyVal = (oKeyVal << m_iStorageBits) | val;
 
-
-
         uint8_t iArray = 0;//pos % 4;
         //pos = pos >> 4;
-
 
         // we want to get the iPosition-th entry
         uint32_t iBitsPerField = sizeof(uint8_t) * 8;
@@ -683,9 +683,9 @@ protected:
      * @param key key to look for
      * @param reprobes amount reprobes used
      * @param bKeyIsValue if true, the key part belongs to value
-     * @return
+     * @return 1 if success, 0 if no success, -1 if locking error
      */
-    bool incrementElement(uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, bool bKeyIsValue)
+    uint8_t incrementElement(uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, bool bKeyIsValue)
     {
 
         TSX::tsx_keyval_t keyval = getElement(iPosition);
@@ -780,7 +780,14 @@ protected:
         }
     }
 
-    bool handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
+    /**
+     *
+     * @param iPos
+     * @param basekey
+     * @param iReprobe
+     * @return 1 if succeeded, 0 if not succeeded, -1 if blocked
+     */
+    uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
     {
         bool bHandled = false;
         uint32_t iPerformedReprobes = 0;
