@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <set>
+#include <omp.h>
 
 using namespace TSX;
 
@@ -30,8 +31,8 @@ public:
     TSXException(std::string sText)
             : std::exception(), m_sText(sText)
     {
-    }
 
+    }
 
     virtual const char* what() const throw()
     {
@@ -124,6 +125,10 @@ public:
 
         m_pHashingFunction = new BijectiveKMapping(m_iK);
 
+
+        this->setThreads(2);
+        this->initialiseLocks();
+
     }
 
     virtual ~TSXHashMap()
@@ -132,12 +137,14 @@ public:
         free(m_pCounterArray);
     }
 
-    bool addKmer(TSX::tsx_kmer_t& kmer)
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer)
     {
         bool bInserted = false;
 
         uint32_t iReprobes = 1;
         TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
+
+        uint8_t iThreadID = omp_get_thread_num();
 
         while ( iReprobes < m_iMaxReprobes )
         {
@@ -146,6 +153,8 @@ public:
             uint64_t iPos = this->getPosition( basekey, iReprobes);
 
             // does this position match to key?
+
+            this->acquireLock(iThreadID, iPos);
             bool bEmpty = positionEmpty(iPos);
 
             if (bEmpty)
@@ -377,6 +386,57 @@ public:
     }
 
 protected:
+
+    void setThreads(uint8_t iThreads)
+    {
+        m_iThreads = iThreads;
+    }
+
+    virtual void initialiseLocks()
+    {
+    }
+
+
+    /**
+     *
+     * @param iArrayPos checks whether iArrayPos is locked
+     * @return threadID of thread who locks iArrayPos or -1
+     */
+    virtual uint8_t position_locked(uint64_t iArrayPos)
+    {
+
+    }
+
+    virtual bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    {
+
+    }
+
+    /**
+     *
+     * @param iThreadID thread id for which the lock is acquired
+     * @param iArrayPos array position for which the lock is acquired
+     * @return True if lock successfully acquired, False otherwise
+     */
+    virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    {
+
+    }
+
+
+    /**
+     *
+     * unlocks all locked array positions for given thread
+     *
+     * @param iThreadID
+     */
+    virtual void unlock_thread(uint8_t iThreadID)
+    {
+    }
+
+    virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
+    {
+    }
 
     UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
     {
@@ -787,7 +847,7 @@ protected:
      * @param iReprobe
      * @return 1 if succeeded, 0 if not succeeded, -1 if blocked
      */
-    uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
+    virtual uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
     {
         bool bHandled = false;
         uint32_t iPerformedReprobes = 0;
@@ -844,7 +904,6 @@ protected:
         }
 
         return false;
-
     }
 
 
@@ -884,6 +943,11 @@ protected:
 
     std::set<uint64_t> m_setUsedPositions;
 
+
+    uint8_t m_iThreads;
+
+    std::vector<uint64_t>* m_pLocked;
+    pthread_mutex_t m_oLockMutex;
 
 };
 

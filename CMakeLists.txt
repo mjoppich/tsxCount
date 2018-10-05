@@ -61,8 +61,9 @@ file(GLOB tsxcountlib_h
 
 file(GLOB tsxcountlib_SRC
         "src/tsxcount/*.cpp"
-        "src/tsxcount/*.cpp"
 )
+
+MESSAGE(${tsxcountlib_SRC})
 
 add_library(tsxcounter ${tsxcountlib_SRC} ${tsxcountlib_h} )
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
