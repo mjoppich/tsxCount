@@ -95,13 +95,25 @@ SET_TARGET_PROPERTIES(splitutils PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SO
 
 # Main app
 file(GLOB tsxCount_H
-        "src/*.h"
         )
 
 file(GLOB tsxCount_SRC
-        "src/*.cpp"
+        "src/mains/main.cpp"
         )
 ADD_EXECUTABLE(tsxCount ${tsxCount_SRC} ${tsxCount_H})
 target_include_directories(tsxCount PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils Threads::Threads)
 install(TARGETS tsxCount DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+
+# Main app
+file(GLOB tsxCountPTHREAD_H
+        )
+
+file(GLOB tsxCountPTHREAD_SRC
+        "src/mains/main_pthread.cpp"
+        )
+ADD_EXECUTABLE(tsxCountPThread ${tsxCountPTHREAD_SRC} ${tsxCountPTHREAD_H})
+target_include_directories(tsxCountPThread PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+TARGET_LINK_LIBRARIES(tsxCountPThread tsxcounter tsxutils Threads::Threads)
+install(TARGETS tsxCountPThread DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)

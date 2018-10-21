@@ -27,6 +27,11 @@ public:
         free(m_pLocked);
     }
 
+    bool countKmer(TSX::tsx_kmer_t& kmer)
+    {
+        return this->addKmer(kmer);
+    }
+
 protected:
 
     void setThreads(uint8_t iThreads)
@@ -133,112 +138,6 @@ protected:
 
         return bRetVal;
     }
-
-
-
-    bool addKmer(TSX::tsx_kmer_t& kmer)
-    {
-        bool bInserted = false;
-
-        uint32_t iReprobes = 1;
-        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
-
-        uint8_t iThreadID = omp_get_thread_num();
-
-        while ( iReprobes < m_iMaxReprobes )
-        {
-
-            // get possible position
-            uint64_t iPos = this->getPosition( basekey, iReprobes);
-
-            this->acquireLock( iThreadID, iPos );
-
-            // does this position match to key?
-            bool bEmpty = positionEmpty(iPos);
-
-            if (bEmpty)
-            {
-
-                TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
-                TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
-
-                this->incrementElement(iPos, key, iReprobes, false);
-
-                // so we can find kmer start positions later without knowing the kmer
-                m_iKmerStarts.setBit(iPos, 1);
-                // TODO this slows down inserting, but is a nice measure ifdef out verbose?
-                m_setUsedPositions.insert(iPos);
-
-                bInserted = true;
-
-                this->releaseLock(iThreadID, iPos);
-
-                break;
-
-            } else {
-
-                // TODO where is the case kmer starts multiple positions later handled?
-                bool bIsKmerStart = m_iKmerStarts.getBit(iPos) == 1;
-                bool bMatchesKey;// = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-
-                if (bIsKmerStart)
-                {
-                    bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-                } else {
-                    bMatchesKey = false;
-                }
-
-                if ((bIsKmerStart) && (bMatchesKey))
-                {
-
-                    this->acquireLock(iThreadID, iPos);
-                    bool bOverflow = this->incrementElement(iPos, basekey, iReprobes, false);
-
-                    if (bOverflow)
-                    {
-                        handleOverflow(iPos, basekey, iReprobes);
-                    }
-
-                    this->releaseLock(iThreadID, iPos);
-
-                    bInserted = true;
-                    break;
-
-                } else {
-
-                    bool bMatchesKey2 = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-
-                    ++iReprobes;
-                    continue;
-                }
-
-
-            }
-
-
-        }
-
-        if (!bInserted)
-        {
-            uint32_t maxPositions = 1 << m_iL;
-
-            std::cerr << "Could not insert kmer " << kmer.to_string()<< std::endl;
-            std::cerr << "Used fields: " << m_setUsedPositions.size() << std::endl;
-            std::cerr << "Available fields: " << std::pow(2.0, m_iL) << std::endl;
-            std::cerr << "k=" << m_iK << " l=" << (uint32_t) m_iL << " entry (key+value) bits=" << m_iKeyValBits << " storage bits=" << m_iStorageBits << std::endl;
-
-            if (m_setUsedPositions.size() == maxPositions)
-            {
-                exit(42);
-            }
-
-            this->addKmer(kmer);
-        }
-
-        return bInserted;
-
-    }
-
 
 
 private:

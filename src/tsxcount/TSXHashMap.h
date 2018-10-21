@@ -170,6 +170,8 @@ public:
                 // TODO this slows down inserting, but is a nice measure ifdef out verbose?
                 m_setUsedPositions.insert(iPos);
 
+                this->releaseLock(iThreadID, iPos);
+
                 bInserted = true;
                 break;
 
@@ -191,6 +193,8 @@ public:
 
                     bool bOverflow = this->incrementElement(iPos, basekey, iReprobes, false);
 
+                    this->releaseLock(iThreadID, iPos);
+
                     if (bOverflow)
                     {
                         handleOverflow(iPos, basekey, iReprobes);
@@ -203,8 +207,10 @@ public:
                 } else {
 
                     bool bMatchesKey2 = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-
                     ++iReprobes;
+
+                    this->releaseLock(iThreadID, iPos);
+
                     continue;
                 }
 
@@ -851,6 +857,8 @@ protected:
     {
         bool bHandled = false;
         uint32_t iPerformedReprobes = 0;
+        uint8_t iThreadID = omp_get_thread_num();
+
 
         while (iPerformedReprobes < m_iMaxReprobes)
         {
@@ -861,6 +869,7 @@ protected:
             // this fetches the element using the global reprobe!
             uint64_t iPos = this->getPosition(basekey, iReprobe);
 
+            this->acquireLock(iThreadID, iPos);
             // does this position match to key?
             bool bEmpty = positionEmpty(iPos);
 
@@ -871,21 +880,31 @@ protected:
                 // the reprobe part must match the number of reprobes back to the previous entry!
                 this->incrementElement(iPos, basekey, iPerformedReprobes, true);
 
+                this->releaseLock(iThreadID, iPos);
+
                 // there can not be an overflow ;)
                 return true;
 
             } else {
 
                 if (this->m_iKmerStarts.getBit(iPos) == 1)
+                {
+                    this->releaseLock(iThreadID, iPos);
                     continue;
+                }
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
                 bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes);
 
                 if (!bMatchesKey)
+                {
+                    this->releaseLock(iThreadID, iPos);
                     continue;
+                }
 
                 bool bOverflow = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
+
+                this->releaseLock(iThreadID, iPos);
 
                 if (!bOverflow)
                 {
@@ -895,7 +914,6 @@ protected:
 
                     // reset performed reprobes as this should indicate number of reprobes needed!
                     iPerformedReprobes = 0;
-
                     std::cerr << "overflow in handleOverflows !" << std::endl;
                 }
 
