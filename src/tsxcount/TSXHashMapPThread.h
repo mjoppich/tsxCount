@@ -39,7 +39,7 @@ protected:
         m_iThreads = iThreads;
     }
 
-    void initialiseLocks()
+    virtual void initialiseLocks()
     {
 
         m_pLocked = (std::vector<uint64_t>*) calloc(m_iThreads, sizeof(std::vector<uint64_t>));
@@ -48,7 +48,6 @@ protected:
         {
             m_pLocked[i] = std::vector<uint64_t>();
         }
-
 
         pthread_mutex_init(&m_oLockMutex, NULL);
 
@@ -70,17 +69,17 @@ protected:
 
             if (iPos != m_pLocked[i].end())
             {
-                return i;
+                return i+1;
             }
         }
 
-        return -1;
+        return 0;
     }
 
     bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
         uint8_t iPosLocked = this->position_locked(iArrayPos);
-        return iPosLocked == -1 or iThreadID == iPosLocked;
+        return iPosLocked == 0 or iThreadID+1 == iPosLocked;
     }
 
     /**
@@ -89,7 +88,7 @@ protected:
      * @param iArrayPos array position for which the lock is acquired
      * @return True if lock successfully acquired, False otherwise
      */
-    bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
 
         pthread_mutex_lock(&m_oLockMutex);
@@ -112,7 +111,7 @@ protected:
      *
      * @param iThreadID
      */
-    void unlock_thread(uint8_t iThreadID)
+    virtual void unlock_thread(uint8_t iThreadID)
     {
         pthread_mutex_lock(&m_oLockMutex);
         m_pLocked[iThreadID].clear();
@@ -120,7 +119,7 @@ protected:
 
     }
 
-    bool releaseLock(uint8_t iThreadID, uint64_t iPos)
+    virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
     {
         pthread_mutex_lock(&m_oLockMutex);
         std::vector<uint64_t>::iterator oIt = std::find(m_pLocked[iThreadID].begin(), m_pLocked[iThreadID].end(), iPos);
@@ -135,6 +134,11 @@ protected:
         }
 
         pthread_mutex_unlock(&m_oLockMutex);
+
+        if (bRetVal == false)
+        {
+            std::cerr << "error releasing lock" << std::endl;
+        }
 
         return bRetVal;
     }

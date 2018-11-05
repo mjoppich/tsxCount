@@ -137,6 +137,11 @@ public:
         free(m_pCounterArray);
     }
 
+    uint32_t getK()
+    {
+        return m_iK;
+    }
+
     virtual bool addKmer(TSX::tsx_kmer_t& kmer)
     {
         bool bInserted = false;
@@ -154,7 +159,13 @@ public:
 
             // does this position match to key?
 
-            this->acquireLock(iThreadID, iPos);
+            bool lockAcquired = this->acquireLock(iThreadID, iPos);
+
+            if (!lockAcquired)
+            {
+                continue;
+            }
+
             bool bEmpty = positionEmpty(iPos);
 
             if (bEmpty)
@@ -163,7 +174,9 @@ public:
                 TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
                 TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
 
-                this->incrementElement(iPos, key, iReprobes, false);
+                // no overflow can happen here ...
+                CIncrementElement incRet = this->incrementElement(iPos, key, iReprobes, false);
+                this->performIncrement(&incRet);
 
                 // so we can find kmer start positions later without knowing the kmer
                 m_iKmerStarts.setBit(iPos, 1);
@@ -191,15 +204,25 @@ public:
                 if ((bIsKmerStart) && (bMatchesKey))
                 {
 
-                    bool bOverflow = this->incrementElement(iPos, basekey, iReprobes, false);
+                    CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobes, false);
 
-                    this->releaseLock(iThreadID, iPos);
-
-                    if (bOverflow)
+                    if (incRet.iOverflow == 1)
                     {
-                        handleOverflow(iPos, basekey, iReprobes);
+                        uint8_t iOvflw = this->handleOverflow(iPos, basekey, iReprobes);
+
+                        if (iOvflw == 2)
+                        {
+                            // TRY AGAIN
+                            continue;
+                        }
+
+                        this->performIncrement(&incRet);
+                    } else if (incRet.iOverflow == 0)
+                    {
+                        this->performIncrement(&incRet);
                     }
 
+                    this->releaseLock(iThreadID, iPos);
 
                     bInserted = true;
                     break;
@@ -391,6 +414,10 @@ public:
         std::cout << std::endl;
     }
 
+    int getThreads() {
+        return m_iThreads;
+    }
+
 protected:
 
     void setThreads(uint8_t iThreads)
@@ -426,7 +453,7 @@ protected:
      */
     virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
-
+        return true;
     }
 
 
@@ -442,6 +469,7 @@ protected:
 
     virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
     {
+        return true;
     }
 
     UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
@@ -743,29 +771,34 @@ protected:
         return ret;
     }
 
+
+    struct CIncrementElement
+    {
+        uint8_t iOverflow;
+        uint64_t iPosition;
+
+        TSX::tsx_key_t okey;
+        TSX::tsx_val_t oval;
+    };
+
     /**
      *
      * @param iPosition position in array
      * @param key key to look for
      * @param reprobes amount reprobes used
      * @param bKeyIsValue if true, the key part belongs to value
-     * @return 1 if success, 0 if no success, -1 if locking error
+     * @return 1 if overflow, 0 if no overflow, 2 if locking error
      */
-    uint8_t incrementElement(uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, bool bKeyIsValue)
+    CIncrementElement incrementElement(uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, bool bKeyIsValue)
     {
 
         TSX::tsx_keyval_t keyval = getElement(iPosition);
         TSX::tsx_val_t value = this->getValFromKeyVal(keyval);
 
+        CIncrementElement oRet;
 
-        if (~value == 0)
+        if (~value == 0) // value == 1111111
         {
-            // an overflow is going to happen!
-            if (~value == 0)
-            {
-                std::cerr << "is zero" << std::endl;
-            }
-
             // WHY IS THIS VALUE == 1 ?
             value = 0;
             value.resize(m_iStorageBits);
@@ -782,9 +815,15 @@ protected:
                     funcpart = 0;
                     TSX::tsx_key_t updkey = (UBigInt(funcpart, 2*m_iK) << m_iL) | reprobes;
 
-                    storeElement(iPosition, updkey, value);
+                    //storeElement(iPosition, updkey, value);
 
-                    return true;
+                    oRet.iOverflow = 1;
+                    oRet.iPosition = iPosition;
+                    oRet.okey = updkey;
+                    oRet.oval = value;
+
+                    return oRet;
+                    //return 1;
 
                 } else {
 
@@ -794,8 +833,15 @@ protected:
                     value = 0;
                     value.resize(m_iStorageBits);
 
-                    storeElement(iPosition, updkey, value);
-                    return false;
+                    //storeElement(iPosition, updkey, value);
+
+                    oRet.iOverflow = 0;
+                    oRet.iPosition = iPosition;
+                    oRet.okey = updkey;
+                    oRet.oval = value;
+
+                    return oRet;
+                    //return 0;
                 }
 
             }
@@ -805,10 +851,16 @@ protected:
             value = 0;
             value.resize(m_iStorageBits);
 
-            storeElement(iPosition, updkey, value);
+            //storeElement(iPosition, updkey, value);
 
             // overflow occurred!
-            return true;
+            oRet.iOverflow = 1;
+            oRet.iPosition = iPosition;
+            oRet.okey = updkey;
+            oRet.oval = value;
+
+            return oRet;
+            //return 1;
         } else {
 
             bool bEmpty = this->positionEmpty( iPosition );
@@ -817,45 +869,62 @@ protected:
 
             //std::cerr << "Storing for key: " << key.to_string() << " value " << value.to_string() << std::endl;
 
+            TSX::tsx_key_t updkey;
+
             if (bKeyIsValue)
             {
 
                 if (bEmpty)
                 {
 
-                    TSX::tsx_key_t updkey(2*m_iK, true);
+                    updkey = TSX::tsx_key_t(2*m_iK, true);
                     updkey = updkey | reprobes;
-                    storeElement(iPosition, updkey, value);
+                    //storeElement(iPosition, updkey, value);
 
                 } else {
 
-                    TSX::tsx_key_t oldkey = this->getKeyFromKeyVal(keyval);
+                    updkey = this->getKeyFromKeyVal(keyval);
 
-                    storeElement(iPosition, oldkey, value);
+                    //storeElement(iPosition, oldkey, value);
                 }
 
 
             } else {
-                TSX::tsx_key_t updkey = this->makeKey(key, reprobes);
-                storeElement(iPosition, updkey, value);
+                updkey = this->makeKey(key, reprobes);
+                //storeElement(iPosition, updkey, value);
             }
 
+            //std::cerr << value.to_string() << std::endl;
 
-            return false;
+            oRet.iOverflow = 0;
+            oRet.iPosition = iPosition;
+            oRet.okey = updkey;
+            oRet.oval = value;
+
+            //std::cerr << oRet.oval.to_string() << std::endl;
+
+            return oRet;
+            //return 0;
 
         }
     }
+
+
+    void performIncrement(CIncrementElement* pElement)
+    {
+        storeElement(pElement->iPosition, pElement->okey, pElement->oval);
+    }
+
 
     /**
      *
      * @param iPos
      * @param basekey
      * @param iReprobe
-     * @return 1 if succeeded, 0 if not succeeded, -1 if blocked
+     * @return 1 if succeeded, 0 if not succeeded, 2 if blocked
      */
     virtual uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
     {
-        bool bHandled = false;
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
 
@@ -869,7 +938,14 @@ protected:
             // this fetches the element using the global reprobe!
             uint64_t iPos = this->getPosition(basekey, iReprobe);
 
-            this->acquireLock(iThreadID, iPos);
+            bool lockAcquired = this->acquireLock(iThreadID, iPos);
+
+            if (!lockAcquired)
+            {
+                return 2;
+            }
+
+
             // does this position match to key?
             bool bEmpty = positionEmpty(iPos);
 
@@ -878,12 +954,15 @@ protected:
                 std::cerr << "New field: POS " << std::to_string(iPos) << " for basekey " << basekey.to_string() << " with reprobes " << std::to_string(iPerformedReprobes) << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                this->incrementElement(iPos, basekey, iPerformedReprobes, true);
+                CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
+
+                // no overflow can happen!
+                this->performIncrement(&incRet);
 
                 this->releaseLock(iThreadID, iPos);
 
                 // there can not be an overflow ;)
-                return true;
+                return 1;
 
             } else {
 
@@ -902,26 +981,38 @@ protected:
                     continue;
                 }
 
-                bool bOverflow = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
+                CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
 
-                this->releaseLock(iThreadID, iPos);
 
-                if (!bOverflow)
+                if (incRet.iOverflow == 0)
                 {
+                    //no overflow
+                    this->releaseLock(iThreadID, iPos);
+                    this->performIncrement(&incRet);
+
                     // no overflow occurred, we are all fine :)
-                    return true;
+                    return 1;
                 } else {
 
-                    // reset performed reprobes as this should indicate number of reprobes needed!
-                    iPerformedReprobes = 0;
-                    std::cerr << "overflow in handleOverflows !" << std::endl;
+                    // get next position lock
+                    uint8_t iOverflowHandled = this->handleOverflow(incRet.iOverflow, incRet.okey, 0);
+
+                    if (iOverflowHandled == 2)
+                    {
+                        return 2;
+                    }
+
+                    // perform increment
+                    this->performIncrement(&incRet);
+
+
                 }
 
             }
 
         }
 
-        return false;
+        return 0;
     }
 
 
@@ -966,6 +1057,7 @@ protected:
 
     std::vector<uint64_t>* m_pLocked;
     pthread_mutex_t m_oLockMutex;
+    omp_lock_t m_oOMPLock;
 
 };
 

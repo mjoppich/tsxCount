@@ -7,19 +7,17 @@
 #include <utils/CLParser.h>
 #include <fastxutils/FastXReader.h>
 #include <utils/SequenceUtils.h>
-#include <tsxcount/TSXHashMapPThread.h>
+#include <tsxcount/TSXHashMapOMP.h>
 #include "testExecution.h"
-
 
 int main(int argc, char *argv[])
 {
 
     uint32_t itK = 8;
-    TSXHashMapPThread* ptMap = new TSXHashMapPThread(8, 4, itK, 2);
-    
-    testHashMap(ptMap, true);
-    
-    return 1;
+    TSXHashMapOMP* pTMap = new TSXHashMapOMP(8, 4, itK);
+    testHashMap(pTMap, true);
+
+    return 0;
 
 
     CLParser oParser(argc, argv);
@@ -30,7 +28,7 @@ int main(int argc, char *argv[])
     FASTXreader<FASTQEntry>* pReader = FASTXreader<FASTQEntry>::createFQReader(&oParser);
     size_t iK = oParser.isSet("k") ? (size_t) oParser.getIntArgument("k") : 15;
 
-    TSXHashMapPThread* pMap = new TSXHashMapPThread(16, 6, iK);
+    TSXHashMapOMP* pMap = new TSXHashMapOMP(16, 6, iK);
 
     pMap->testHashFunction();
 

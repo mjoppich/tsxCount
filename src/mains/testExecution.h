@@ -1,16 +1,16 @@
+//
+// Created by mjopp on 24/10/2018.
+//
 
-#include <iostream>
+#ifndef TSXCOUNT_TESTEXECUTION_H
+#define TSXCOUNT_TESTEXECUTION_H
 
-
-#include <tsxcount/TSXHashMap.h>
+#include <vector>
 #include <tsxcount/TSXTypes.h>
-#include <utils/CLParser.h>
-#include <fastxutils/FastXReader.h>
 #include <utils/SequenceUtils.h>
-#include <tsxcount/TSXHashMapTSX.h>
+#include <tsxcount/TSXHashMap.h>
 
-
-void evaluate(TSXHashMapTSX* pMap, UBigInt& kmer, const size_t iRefCount)
+void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
 {
 
     UBigInt oRes1 = pMap->getKmerCount(kmer);
@@ -26,7 +26,7 @@ void evaluate(TSXHashMapTSX* pMap, UBigInt& kmer, const size_t iRefCount)
 
 }
 
-void testHashMap()
+void testHashMap(TSXHashMap* pMap, bool parallel=false)
 {
     UBigInt m_iKeyMask(128, true);
     uint64_t iBla = 0x8000000800000ULL;
@@ -60,9 +60,7 @@ void testHashMap()
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
-    uint32_t iK = 8;
 
-    TSXHashMapTSX* pMap = new TSXHashMapTSX(8, 4, iK);
 
 
     UBigInt oTest ("110110010001");
@@ -73,29 +71,29 @@ void testHashMap()
     UBigInt oKmer2(1);
     UBigInt oKmer3(178);
 
-    oKmer1.resize( 2*iK );
-    oKmer2.resize( 2*iK );
-    oKmer3.resize( 2*iK );
+    oKmer1.resize( 2*pMap->getK() );
+    oKmer2.resize( 2*pMap->getK() );
+    oKmer3.resize( 2*pMap->getK() );
 
-
-
-    /*
-    oTest = ~oTest;
-    std::cerr << oTest.to_string() << std::endl;
-    std::cerr << (oTest == 0) << std::endl;
-*/
-/*
-    pMap->addKmer( oKmer1 );
-    pMap->addKmer( oKmer2 );
-    pMap->addKmer( oKmer1 );
-*/
 
     const size_t iMaxCount = 2048*4;
 
+    if (!parallel)
+    {
+        omp_set_num_threads(1);
+    } else {
+        omp_set_num_threads(pMap->getThreads());
+    }
+
+    std::cerr << "Parellel=" << parallel << " Running on " << omp_get_num_threads() << " threads on map configured for " << pMap->getThreads() << std::endl;
+
     size_t i;
+
+#pragma omp parallel for
     for ( i = 0; i < iMaxCount; ++i)
     {
-        std::cerr << "adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
+
+        std::cerr << "Thread "<< omp_get_thread_num() << " adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
         pMap->addKmer( oKmer1 );
 
 
@@ -134,75 +132,4 @@ std::vector<TSX::tsx_kmer_t> createKMers(std::string& sSequence, size_t iK)
 
 }
 
-int main(int argc, char *argv[])
-{
-
-    testHashMap();
-
-    return 1;
-
-
-    CLParser oParser(argc, argv);
-
-    oParser.setArgument("k", std::to_string(10));
-    oParser.setArgument("fastq", "/mnt/c/ownCloud/data/tsx/small.fq");
-
-    FASTXreader<FASTQEntry>* pReader = FASTXreader<FASTQEntry>::createFQReader(&oParser);
-    size_t iK = oParser.isSet("k") ? (size_t) oParser.getIntArgument("k") : 15;
-
-    TSXHashMapTSX* pMap = new TSXHashMapTSX(16, 6, iK);
-
-    pMap->testHashFunction();
-
-    bool exitNow = false;
-
-    while (pReader->hasNext() and !exitNow)
-    {
-
-        std::vector<FASTQEntry> oEntries = pReader->readEntries(100);
-
-        for (size_t i = 0; i < oEntries.size(); ++i)
-        {
-            FASTQEntry* pEntry = &(oEntries.at(i));
-
-            std::string sSeq = pEntry->getSequence();
-            std::vector<TSX::tsx_kmer_t> allKmers = createKMers(sSeq, iK);
-
-            for (auto kmer : allKmers)
-            {
-                pMap->countKmer(kmer);
-
-                exitNow=false;
-            }
-
-        }
-
-
-    }
-
-    std::cout << "Added a total of " << pMap->getKmerCount() << " different kmers" << std::endl;
-
-    std::vector<TSX::tsx_kmer_t> allKmers = pMap->getAllKmers();
-
-    std::ofstream("/mnt/c/ownCloud/data/tsx/small.fq");
-
-#pragma omp parallel for
-    for (size_t i=0; i < allKmers.size(); ++i)
-    {
-
-        TSX::tsx_kmer_t& kmer = allKmers.at(i);
-
-        UBigInt oCount = pMap->getKmerCount(kmer);
-
-#pragma omp critical
-        {
-            //std::cout << kmer.to_string() << "\t" << TSXSeqUtils::toSequence(kmer) << "\t" << oCount.toUInt() << std::endl;
-        }
-    }
-
-    std::cout << "Printed " << allKmers.size() << " kmers" << std::endl;
-
-
-
-    return 0;
-}
+#endif //TSXCOUNT_TESTEXECUTION_H
