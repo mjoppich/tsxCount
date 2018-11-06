@@ -16,7 +16,7 @@
 
 #include <iostream>
 #include <bitset>
-#include <stdlib.h>
+#include <cstdlib>
 #include <vector>
 #include <set>
 #include <omp.h>
