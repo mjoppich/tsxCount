@@ -15,15 +15,6 @@
 #along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.1)
-
-set(CMAKE_CXX_STANDARD 11)
-
-
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-project (tsxCount)
-
-
 SET (CMAKE_C_COMPILER             "/usr/bin/clang")
 SET (CMAKE_C_FLAGS                "-Wall -std=c99")
 SET (CMAKE_C_FLAGS_DEBUG          "-g")
@@ -37,11 +28,20 @@ SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
 SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
+set(CMAKE_CXX_STANDARD 11)
+
+
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+project (tsxCount)
+
+
+
 
 set(CMAKE_CXX_STANDARD 11)
 
 message(STATUS "Checking OpenMP")
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 IF(OPENMP_FOUND)
     message("Found OpenMP!")
     # add flags for OpenMP
@@ -173,7 +173,7 @@ file(GLOB tsxCountTSX_SRC
 ADD_EXECUTABLE(tsxCountTSX ${tsxCountTSX_SRC} ${tsxCountTSX_H})
 target_include_directories(tsxCountTSX PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_compile_options(tsxCountTSX PRIVATE -Wall ${OpenMP_CXX_FLAGS})
+target_compile_options(tsxCountTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm)
 
-TARGET_LINK_LIBRARIES(tsxCountTSX PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter tsxutils Threads::Threads gomp)
+TARGET_LINK_LIBRARIES(tsxCountTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils Threads::Threads gomp)
 install(TARGETS tsxCountTSX DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)

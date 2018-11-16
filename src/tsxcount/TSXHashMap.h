@@ -92,7 +92,7 @@ public:
         size_t iBytes = std::ceil( (float)(iElements * iBitsPerElement) / 8.0f);
 
         std::cerr << "Creating array with " << std::to_string(iBytes) << " bytes for " << std::to_string(iElements) << " places." << std::endl;
-        m_pCounterArray = (uint8_t*) calloc( sizeof(uint8_t), iBytes);
+        m_pCounterArray = (FIELDTYPE*) calloc( sizeof(FIELDTYPE), iBytes);
         m_iKmerStarts.resize(iElements);
 
 
@@ -140,6 +140,11 @@ public:
     uint32_t getK()
     {
         return m_iK;
+    }
+
+    size_t getUsedPositions()
+    {
+        return m_setUsedPositions.size();
     }
 
     virtual bool addKmer(TSX::tsx_kmer_t& kmer)
@@ -205,10 +210,12 @@ public:
                 {
 
                     CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobes, false);
+                    std::vector<CIncrementElement> vOPS;
+                    vOPS.insert(vOPS.end(), incRet);
 
                     if (incRet.iOverflow == 1)
                     {
-                        uint8_t iOvflw = this->handleOverflow(iPos, basekey, iReprobes);
+                        uint8_t iOvflw = this->handleOverflow(iPos, basekey, iReprobes, &vOPS);
 
                         if (iOvflw == 2)
                         {
@@ -216,13 +223,18 @@ public:
                             continue;
                         }
 
-                        this->performIncrement(&incRet);
-                    } else if (incRet.iOverflow == 0)
-                    {
-                        this->performIncrement(&incRet);
+                        //this->performIncrement(&incRet);
                     }
 
-                    this->releaseLock(iThreadID, iPos);
+                    for (auto rit = vOPS.rbegin(); rit != vOPS.rend(); ++rit)
+                    {
+                        CIncrementElement inc = (*rit);
+                        this->performIncrement(&inc);
+
+                        this->releaseLock(iThreadID, inc.iPosition);
+                    }
+
+                    //this->releaseLock(iThreadID, iPos);
 
                     bInserted = true;
                     break;
@@ -679,6 +691,17 @@ protected:
 
     }
 
+    inline
+    void storeKeyValElement(uint64_t pos, TSX::tsx_keyval_t& oKeyVal)
+    {
+        // we want to get the iPosition-th entry
+        std::div_t oStartPos = udiv( (uint32_t) pos*m_iKeyValBits, sizeof(uint8_t) * 8);
+
+        //UBigInt oReturn(m_iKeyValBits);
+        UBigInt::storeIntoMemory(m_pCounterArray, (uint32_t) oStartPos.quot, (uint32_t) oStartPos.rem, oKeyVal, m_iKeyValBits);
+    }
+
+
     void storeElement(uint64_t pos, TSX::tsx_key_t& key, TSX::tsx_val_t& val)
     {
 
@@ -696,17 +719,23 @@ protected:
         //UBigInt oReturn(m_iKeyValBits);
         UBigInt::storeIntoMemory(m_pCounterArray, oStartPos.quot, oStartPos.rem, oKeyVal, m_iKeyValBits);
 
-        TSX::tsx_keyval_t oStoredKeyVal = this->getElement(pos);
 
+        /*
+        TSX::tsx_keyval_t oStoredKeyVal = this->getElement(pos);
         bool bIsStoredCorrectly = (oStoredKeyVal == oKeyVal);
 
         if (!bIsStoredCorrectly)
         {
+            exit(111);
+
             std::cerr << "Should be: " << oKeyVal.to_string() << std::endl;
             std::cerr << "but is   : " << oStoredKeyVal.to_string() << std::endl;
             UBigInt::storeIntoMemory(m_pCounterArray, oStartPos.quot, oStartPos.rem, oKeyVal, m_iKeyValBits);
             oStoredKeyVal = this->getElement(pos);
+
         }
+
+        */
 
         //std::cerr << "keyval stored: " << oKeyVal.to_string() << " into array " << std::to_string(iArray) << " in pos " << std::to_string(pos) << std::endl;
 
@@ -777,8 +806,11 @@ protected:
         uint8_t iOverflow;
         uint64_t iPosition;
 
-        TSX::tsx_key_t okey;
-        TSX::tsx_val_t oval;
+        //TSX::tsx_key_t okey;
+        //TSX::tsx_val_t oval;
+
+        TSX::tsx_keyval_t keyval;
+        TSX::tsx_keyval_t original;
     };
 
     /**
@@ -796,6 +828,8 @@ protected:
         TSX::tsx_val_t value = this->getValFromKeyVal(keyval);
 
         CIncrementElement oRet;
+
+        oRet.original = keyval;
 
         if (~value == 0) // value == 1111111
         {
@@ -817,10 +851,13 @@ protected:
 
                     //storeElement(iPosition, updkey, value);
 
+                    TSX::tsx_keyval_t oKeyVal(updkey, 2*m_iK + m_iStorageBits);
+                    oKeyVal = (oKeyVal << m_iStorageBits) | value;
+                    oKeyVal.resize(m_iKeyValBits);
+
                     oRet.iOverflow = 1;
                     oRet.iPosition = iPosition;
-                    oRet.okey = updkey;
-                    oRet.oval = value;
+                    oRet.keyval = oKeyVal;
 
                     return oRet;
                     //return 1;
@@ -834,11 +871,13 @@ protected:
                     value.resize(m_iStorageBits);
 
                     //storeElement(iPosition, updkey, value);
+                    TSX::tsx_keyval_t oKeyVal(updkey, 2*m_iK + m_iStorageBits);
+                    oKeyVal = (oKeyVal << m_iStorageBits) | value;
+                    oKeyVal.resize(m_iKeyValBits);
 
                     oRet.iOverflow = 0;
                     oRet.iPosition = iPosition;
-                    oRet.okey = updkey;
-                    oRet.oval = value;
+                    oRet.keyval = oKeyVal;
 
                     return oRet;
                     //return 0;
@@ -854,10 +893,13 @@ protected:
             //storeElement(iPosition, updkey, value);
 
             // overflow occurred!
+            TSX::tsx_keyval_t oKeyVal(updkey, 2*m_iK + m_iStorageBits);
+            oKeyVal = (oKeyVal << m_iStorageBits) | value;
+            oKeyVal.resize(m_iKeyValBits);
+
             oRet.iOverflow = 1;
             oRet.iPosition = iPosition;
-            oRet.okey = updkey;
-            oRet.oval = value;
+            oRet.keyval = oKeyVal;
 
             return oRet;
             //return 1;
@@ -896,10 +938,13 @@ protected:
 
             //std::cerr << value.to_string() << std::endl;
 
+            TSX::tsx_keyval_t oKeyVal(updkey, 2*m_iK + m_iStorageBits);
+            oKeyVal = (oKeyVal << m_iStorageBits) | value;
+            oKeyVal.resize(m_iKeyValBits);
+
             oRet.iOverflow = 0;
             oRet.iPosition = iPosition;
-            oRet.okey = updkey;
-            oRet.oval = value;
+            oRet.keyval = oKeyVal;
 
             //std::cerr << oRet.oval.to_string() << std::endl;
 
@@ -912,7 +957,8 @@ protected:
 
     void performIncrement(CIncrementElement* pElement)
     {
-        storeElement(pElement->iPosition, pElement->okey, pElement->oval);
+        //storeElement(pElement->iPosition, pElement->okey, pElement->oval);
+        this->storeKeyValElement(pElement->iPosition, pElement->keyval);
     }
 
 
@@ -923,7 +969,7 @@ protected:
      * @param iReprobe
      * @return 1 if succeeded, 0 if not succeeded, 2 if blocked
      */
-    virtual uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
+    virtual uint8_t handleOverflow(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe, std::vector<CIncrementElement>* pOPS)
     {
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
@@ -951,15 +997,16 @@ protected:
 
             if (bEmpty)
             {
-                std::cerr << "New field: POS " << std::to_string(iPos) << " for basekey " << basekey.to_string() << " with reprobes " << std::to_string(iPerformedReprobes) << std::endl;
+                //std::cerr << "New field: POS " << std::to_string(iPos) << " for basekey " << basekey.to_string() << " with reprobes " << std::to_string(iPerformedReprobes) << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
                 CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
 
                 // no overflow can happen!
-                this->performIncrement(&incRet);
+                //this->performIncrement(&incRet);
+                pOPS->insert(pOPS->end(), incRet);
 
-                this->releaseLock(iThreadID, iPos);
+                //this->releaseLock(iThreadID, iPos);
 
                 // there can not be an overflow ;)
                 return 1;
@@ -982,20 +1029,21 @@ protected:
                 }
 
                 CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true);
-
+                pOPS->insert(pOPS->end(), incRet);
 
                 if (incRet.iOverflow == 0)
                 {
                     //no overflow
-                    this->releaseLock(iThreadID, iPos);
-                    this->performIncrement(&incRet);
+                    //this->performIncrement(&incRet);
+                    //this->releaseLock(iThreadID, iPos);
 
                     // no overflow occurred, we are all fine :)
                     return 1;
                 } else {
 
                     // get next position lock
-                    uint8_t iOverflowHandled = this->handleOverflow(incRet.iOverflow, incRet.okey, 0);
+                    TSX::tsx_key_t okey = this->getKeyFromKeyVal(incRet.keyval);
+                    uint8_t iOverflowHandled = this->handleOverflow(incRet.iOverflow, okey, 0, pOPS);
 
                     if (iOverflowHandled == 2)
                     {
@@ -1003,8 +1051,8 @@ protected:
                     }
 
                     // perform increment
-                    this->performIncrement(&incRet);
-
+                    //this->performIncrement(&incRet);
+                    return 1;
 
                 }
 
@@ -1023,7 +1071,7 @@ protected:
      */
 
 
-    uint8_t* m_pCounterArray;
+    FIELDTYPE* m_pCounterArray;
 
     TSX::tsx_keyval_t m_mask_key_value = 0;
     TSX::tsx_keyval_t m_mask_value_key = 0;

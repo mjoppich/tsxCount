@@ -22,7 +22,7 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
         iKmer1Count = oRes1.toUInt();
     }
 
-    std::cerr << "kmer: " << kmer.to_string() << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << std::endl;
+    std::cerr << "kmer: " << kmer.to_string() << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount <<  std::endl;
 
 }
 
@@ -85,36 +85,51 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
         omp_set_num_threads(pMap->getThreads());
     }
 
-    std::cerr << "Parellel=" << parallel << " Running on " << omp_get_num_threads() << " threads on map configured for " << pMap->getThreads() << std::endl;
 
     size_t i;
 
-#pragma omp parallel for
-    for ( i = 0; i < iMaxCount; ++i)
+#pragma omp parallel num_threads(2)
     {
 
-        std::cerr << "Thread "<< omp_get_thread_num() << " adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
-        pMap->addKmer( oKmer1 );
-
-
-        if ((i % 2) == 0)
+#pragma omp critical
         {
-            std::cerr << "adding kmer: " << oKmer2.to_string() << " " << std::to_string(i) << std::endl;
-            pMap->addKmer( oKmer2 );
+            std::cerr << "Parellel=" << parallel << " Running on " << omp_get_num_threads() << " threads on map configured for " << pMap->getThreads() << std::endl;
+    };
+
+
+        #pragma omp for
+        for (i = 0; i < iMaxCount; ++i) {
+
+            std::cerr << "Thread " << omp_get_thread_num() << " adding kmer: " << oKmer1.to_string() << " "
+                      << std::to_string(i) << std::endl;
+            pMap->addKmer(oKmer1);
+
+
+            UBigInt oRes1 = pMap->getKmerCount(oKmer1);
+            uint32_t iKmer1Count = oRes1.toUInt();
+
+            std::cout << "Kmer1 " << iKmer1Count << std::endl;
+
+            if ((i % 2) == 0) {
+                std::cerr << "adding kmer: " << oKmer2.to_string() << " " << std::to_string(i) << std::endl;
+                pMap->addKmer(oKmer2);
+            }
+
+
+            if ((i % 4) == 0) {
+                std::cerr << "adding kmer: " << oKmer3.to_string() << " " << std::to_string(i) << std::endl;
+                pMap->addKmer(oKmer3);
+            }
         }
 
-
-        if ((i % 4) == 0)
-        {
-            std::cerr << "adding kmer: " << oKmer3.to_string() << " " << std::to_string(i) << std::endl;
-            pMap->addKmer(oKmer3);
-        }
     }
 
 
+
+
     evaluate(pMap, oKmer1, iMaxCount);
-    evaluate(pMap, oKmer2, iMaxCount);
-    evaluate(pMap, oKmer3, iMaxCount);
+    evaluate(pMap, oKmer2, iMaxCount/2);
+    evaluate(pMap, oKmer3, iMaxCount/4);
 }
 
 std::vector<TSX::tsx_kmer_t> createKMers(std::string& sSequence, size_t iK)
