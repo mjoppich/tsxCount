@@ -112,7 +112,7 @@ public:
 
 
                 if (status != _XBEGIN_STARTED) {
-                    std::cout << "STATUS ERROR " << (uint) status << std::endl;
+                    //std::cout << "STATUS ERROR " << (uint) status << std::endl;
                     if (_XABORT_CODE(status)==0xff)
                     {
                         ++iAborts;
@@ -214,6 +214,8 @@ public:
                         }
                         // transaction aborted
                         // => retry
+
+                        /*
                         std::cout << "STATUS ERROR NE " << (uint) status << " " << (int) _XABORT_CODE(status) << " " << vOPS.size() << std::endl;
 
 
@@ -222,6 +224,7 @@ public:
                             CIncrementElement* pINC = &(vOPS.data()[i]);
                             std::cout << pINC->keyval.to_string() << " overflow " << (int) pINC->iOverflow << " position " << pINC->iPosition << " " << this->getElement(pINC->iPosition).to_string() << std::endl;
                         }
+                         */
 
                         continue;
                     }

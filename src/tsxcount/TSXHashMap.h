@@ -127,7 +127,6 @@ public:
 
 
         this->setThreads(2);
-        this->initialiseLocks();
 
     }
 
@@ -430,12 +429,15 @@ public:
         return m_iThreads;
     }
 
-protected:
-
     void setThreads(uint8_t iThreads)
     {
         m_iThreads = iThreads;
+        this->initialiseLocks();
     }
+
+protected:
+
+
 
     virtual void initialiseLocks()
     {
