@@ -78,9 +78,9 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     oKmer4.resize( 2*pMap->getK() );
 
 
-    const size_t iMaxCount = 2048*4*2;
+    const size_t iMaxCount = 2048*4*16;
 
-    uint8_t threads = 4;
+    uint8_t threads = 8;
     pMap->setThreads(threads);
 
     std::cout << "Running on " << (int) threads << " threads" << std::endl;
