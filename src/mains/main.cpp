@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     uint32_t itK = 8;
     TSXHashMap* ptMap = new TSXHashMap(8, 4, itK);
 
-    testHashMap(ptMap, true);
+    testHashMap(ptMap, false);
 
     return 1;
 
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
             FASTQEntry* pEntry = &(oEntries.at(i));
 
             std::string sSeq = pEntry->getSequence();
-            std::vector<TSX::tsx_kmer_t> allKmers = createKMers(sSeq, iK);
+            std::vector<TSX::tsx_kmer_t> allKmers = createKMers(sSeq, iK, pMap->getMemoryPool());
 
             for (auto kmer : allKmers)
             {

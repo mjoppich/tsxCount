@@ -73,10 +73,10 @@ namespace TSXSeqUtils {
         return sRetSeq;
     }
 
-    static TSX::tsx_kmer_t fromSequence(std::string& seq)
+    static TSX::tsx_kmer_t fromSequence(std::string& seq, MemoryPool<FIELDTYPE>* pPool)
     {
 
-        UBigInt oRet(seq.length()*2, false);
+        UBigInt oRet(seq.length()*2, false, pPool);
         bool hadN = false;
 
         for (size_t i = 0; i < seq.length(); ++i)

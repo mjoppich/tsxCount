@@ -15,14 +15,14 @@
 #along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.1)
-SET (CMAKE_C_COMPILER             "icc")
+SET (CMAKE_C_COMPILER             "clang")
 SET (CMAKE_C_FLAGS                "-Wall -std=c99")
 SET (CMAKE_C_FLAGS_DEBUG          "-g")
 SET (CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
 SET (CMAKE_C_FLAGS_RELEASE        "-O4 -DNDEBUG")
 SET (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
 
-SET (CMAKE_CXX_COMPILER             "icpc")
+SET (CMAKE_CXX_COMPILER             "clang++")
 SET (CMAKE_CXX_FLAGS                "-Wall")
 SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
 SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
@@ -54,6 +54,11 @@ IF(OPENMP_FOUND)
 ELSE()
     message("Missed OpenMP!")
 ENDIF()
+
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost REQUIRED)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -108,7 +113,8 @@ file(GLOB tsxutilslib_SRC
         )
 
 add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h})
-TARGET_LINK_LIBRARIES(tsxutils z Threads::Threads)
+target_include_directories(tsxutils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${Boost_INCLUDE_DIRS})
+TARGET_LINK_LIBRARIES(tsxutils ${Boost_LIBRARIES} z Threads::Threads)
 
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)

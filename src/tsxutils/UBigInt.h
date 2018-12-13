@@ -20,6 +20,7 @@
 #include <bitset>
 #include <stdlib.h>
 
+#include "MemoryPool.h"
 
 #ifndef BITSTOFIELDS
 #define BITSTOFIELDS(x) (x >> 3)
@@ -108,17 +109,21 @@ public:
         return this->m_iBits;
     }
 
-    static UBigInt createFromBitShift(uint32_t iBits, uint32_t iPosition)
+    static UBigInt createFromBitShift(uint32_t iBits, uint32_t iPosition, MemoryPool<FIELDTYPE>* pPool)
     {
 
-        UBigInt oRet = UBigInt(iBits, true);
+        UBigInt oRet = UBigInt(iBits, true, pPool);
 
         oRet = 1;
-
         oRet = oRet << iPosition;
 
         return oRet;
 
+    }
+
+    void setPool(MemoryPool<FIELDTYPE>* pPool)
+    {
+        this->m_pPool = pPool;
     }
 
 
@@ -165,6 +170,11 @@ public:
         return sBitSeq;
     }
 
+    void print_string()
+    {
+        std::cout << this->to_string() << std::endl;
+    }
+
     /**
      *
      * @param pPosition start position of array
@@ -173,13 +183,11 @@ public:
      * @param iLength of memory block in bits
      * @return
      */
-    static UBigInt createFromMemory(FIELDTYPE* pPosition, uint64_t iIdx, uint8_t iOffsetBits, uint32_t iLength)
+    static UBigInt createFromMemory(FIELDTYPE* pPosition, uint64_t iIdx, uint8_t iOffsetBits, uint32_t iLength, MemoryPool<FIELDTYPE>* pPool)
     {
 
         FIELDTYPE* pPos = pPosition + iIdx;
-
-        UBigInt oReturn = UBigInt(iLength, true);
-
+        UBigInt oReturn = UBigInt(iLength, true, pPool);
         oReturn.copy_content_bits(pPos, iOffsetBits, iLength);
 
         return oReturn;
@@ -206,27 +214,33 @@ public:
 
     }
 
-    UBigInt(uint64_t iBits, uint8_t* pMemPos, uint8_t iOffset)
-    : UBigInt(iBits, true)
+    UBigInt(uint64_t iBits, uint8_t* pMemPos, uint8_t iOffset, MemoryPool<FIELDTYPE>* pPool)
+    : UBigInt(iBits, true, pPool)
     {
         uint32_t iFieldsNeeded = std::ceil(iBits / this->m_iFieldSize);
 
-        UBigInt oIntermediate = UBigInt(iFieldsNeeded * this->m_iFieldSize, false);
+        UBigInt oIntermediate = UBigInt(iFieldsNeeded * this->m_iFieldSize, false, pPool);
         oIntermediate.copy_content_from_le((FIELDTYPE*) pMemPos, iBits);
+
+    }
+
+    UBigInt()
+            : UBigInt(0, true, NULL)
+    {
 
     }
 
     /**
      * \brief default constructor
      */
-    UBigInt()
-    : UBigInt(64, true)
+    UBigInt(MemoryPool<FIELDTYPE>* pPool)
+    : UBigInt(64, true, pPool)
     {
 
     }
 
-    UBigInt(std::string sInput)
-    : UBigInt(sInput.size(), true)
+    UBigInt(std::string sInput, MemoryPool<FIELDTYPE>* pPool)
+    : UBigInt(sInput.size(), true, pPool)
     {
         for (size_t i = 0; i < sInput.size(); ++i)
         {
@@ -246,25 +260,25 @@ public:
       *
       * This implements a new UBigInt constructor. The Array can be directly initialized with 0
       */
-    UBigInt(uint64_t iBits, bool bZero)
+    UBigInt(uint64_t iBits, bool bZero, MemoryPool<FIELDTYPE>* pPool)
     {
-        initialize(iBits);
+        initialize(iBits, pPool);
     }
 
     UBigInt(UBigInt & oOther )
-     : UBigInt(oOther.m_iBits, true)
+     : UBigInt(oOther.m_iBits, true, oOther.m_pPool)
     {
         copy_content(oOther);
     }
 
     UBigInt(UBigInt & oOther, uint32_t iBits )
-            : UBigInt(iBits, true)
+            : UBigInt(iBits, true, oOther.m_pPool)
     {
         copy_content(oOther);
     }
 
     UBigInt(const UBigInt & oOther )
-            : UBigInt(oOther.m_iBits, true)
+            : UBigInt(oOther.m_iBits, true, oOther.m_pPool)
     {
         copy_content(oOther);
     }
@@ -287,6 +301,8 @@ public:
             return;
 
         FIELDTYPE* pOldArray = m_pArray;
+        MemLoc oOldMemLoc = m_oAlloc;
+
         uint32_t iOldBits = m_iBits;
 
         m_pArray = NULL;
@@ -309,9 +325,9 @@ public:
 
             m_pArray[ fields.quot ] = oInter >> (m_iFieldSize-fields.rem);
 
-            delete pOldArray;
-
         }
+
+        this->m_pPool->free(oOldMemLoc);
 
     }
     /**
@@ -319,12 +335,12 @@ public:
      * @param value
      * @return big int with x bits and value copied
      */
-    static UBigInt fromUint8(uint8_t value)
+    static UBigInt fromUint8(uint8_t value, MemoryPool<FIELDTYPE>* pPool)
     {
 
         FIELDTYPE oVal = value;
 
-        UBigInt oRet(8, true);
+        UBigInt oRet(8, true, pPool);
         oRet.copy_content_to_array(&oVal, 0, 8);
 
         return oRet;
@@ -336,11 +352,11 @@ public:
      * @param value
      * @return
      */
-    static UBigInt fromUint16(uint16_t value)
+    static UBigInt fromUint16(uint16_t value, MemoryPool<FIELDTYPE>* pPool)
     {
         FIELDTYPE oVal = value;
 
-        UBigInt oRet(8, true);
+        UBigInt oRet(8, true, pPool);
         oRet.copy_content_to_array( &oVal, 0, 16);
 
         return oRet;
@@ -349,8 +365,8 @@ public:
 
 
 
-    UBigInt(uint64_t iValue)
-    : UBigInt(0, true)
+    UBigInt(uint64_t iValue, MemoryPool<FIELDTYPE>* pPool)
+    : UBigInt(0, true, pPool)
     {
 
         uint32_t bits = UBigInt::log_2(iValue)+1;
@@ -382,6 +398,7 @@ public:
     {
 
         this->reset();
+        this->setPool(oOther.m_pPool);
         this->initialize(oOther.m_iBits);
         this->copy_content(oOther);
 
@@ -391,7 +408,7 @@ public:
 
     UBigInt operator- (const uint64_t iLeft)
     {
-        UBigInt oLeft = iLeft;
+        UBigInt oLeft(iLeft, this->m_pPool);
 
         return operator-(oLeft);
     }
@@ -411,9 +428,23 @@ public:
 
     UBigInt operator+ (const uint64_t iLeft)
     {
-        UBigInt oLeft = iLeft;
+        UBigInt oLeft(iLeft, this->m_pPool);
 
         return operator+(oLeft);
+    }
+
+    UBigInt operator++()
+    {
+        this->add(UBigInt(1, this->m_pPool)); // TODO add constant 1
+        return *this;
+    }
+
+    UBigInt operator++(int dummy)
+    {
+        UBigInt ret(this->self());
+
+        this->add(UBigInt(1, this->m_pPool)); // TODO add constant 1
+        return ret;
     }
 
     UBigInt operator+ (const UBigInt & oOther)
@@ -477,6 +508,30 @@ public:
         oRet.bitCompl();
 
         return oRet;
+    }
+
+
+    bool isZero()
+    {
+        div_t procs = div(this->m_iBits, m_iFieldSize);
+        size_t checkIdx = 0;
+
+        if (procs.quot > 0)
+        {
+            for (checkIdx = 0; checkIdx <= procs.quot-1; ++checkIdx)
+            {
+                if (this->m_pArray[checkIdx] != 0)
+                    return false;
+            }
+        }
+
+        size_t iShift = m_iFieldSize - procs.rem;
+
+        FIELDTYPE thisRemain = this->m_pArray[checkIdx] << iShift;
+
+        bool result = (thisRemain == 0);
+
+        return result;
     }
 
     bool isEqual(const UBigInt* pLeft, const UBigInt* pRight, uint32_t iBits)
@@ -626,7 +681,7 @@ public:
 
         // return this & ((1 << iBitPos) -1)
 
-        UBigInt oRet(iBitPos, true);
+        UBigInt oRet(iBitPos, true, this->m_pPool);
         oRet.copy_content_bits( this->m_pArray, 0, iBitPos);
         return oRet;
 
@@ -734,9 +789,9 @@ public:
 
     }
 
-    static UBigInt fromString(std::string sInput) {
+    static UBigInt fromString(std::string sInput, MemoryPool<FIELDTYPE>* pPool) {
 
-        UBigInt oBigInt(sInput.size(), true);
+        UBigInt oBigInt(sInput.size(), true, pPool);
 
         for (size_t i = 0; i < sInput.size(); ++i)
         {
@@ -754,199 +809,6 @@ public:
         return oBigInt;
 
     }
-
-    /**
-     *
-     * @param pSrc destination array
-     * @param iBitStart offset in first field of pSrc
-     * @param iBitCount how many bits to copy
-     */
-    void copy_content_to_array(FIELDTYPE* pDest, uint32_t iBitStart, uint32_t iBitCount)
-    {
-
-        // how many bits can I copy into first, not fully occupied field?
-        uint8_t iOffset = iBitStart % m_iFieldSize;
-
-        // TODO copy first field
-        FIELDTYPE iThisVal = m_pArray[0] << iOffset;
-        FIELDTYPE iOldVal = pDest[0] << (m_iFieldSize - iOffset);
-        iOldVal = iOldVal >> (m_iFieldSize - iOffset);
-
-        pDest[0] = iThisVal | iOldVal;
-
-        // how many bits remain to be copied?
-        uint32_t iBitsRemaining = iBitCount - (m_iFieldSize - iOffset);
-        // how many full fields are this?
-        div_t fields = div(iBitsRemaining, m_iFieldSize);
-
-        // copy full fields over
-        uint32_t i = 0;
-        for ( i = 0; i < fields.quot; ++i)
-        {
-            // TODO copy full fields
-            FIELDTYPE iPartRight = m_pArray[i] >> (m_iFieldSize-iOffset);
-            FIELDTYPE iPartLeft = m_pArray[i+1] << iOffset;
-
-            FIELDTYPE iThisVal = iPartLeft | iPartRight;
-
-            pDest[i+1] = iThisVal;
-
-            iBitsRemaining -= m_iFieldSize;
-        }
-
-        if (iBitsRemaining > 0)
-        {
-            if (iBitsRemaining <= iOffset)
-            {
-
-                // we do not need a rest from the next field
-                FIELDTYPE iPartRight = m_pArray[fields.quot] << (m_iFieldSize-iOffset);
-                iPartRight = iPartRight << (iOffset-iBitsRemaining);
-                iPartRight = iPartRight >> (iOffset-iBitsRemaining);
-                iPartRight = iPartRight >> m_iFieldSize-iOffset;
-
-                FIELDTYPE iOldValue = pDest[fields.quot+1];
-                iOldValue = iOldValue >> iBitsRemaining;
-                iOldValue = iOldValue << iBitsRemaining;
-
-                pDest[fields.quot+1] = iOldValue | iPartRight;
-
-            } else {
-
-                // we need a rest from the next field
-                FIELDTYPE iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
-
-                uint32_t iRemaining = iBitsRemaining - iOffset;
-
-                // need the rightmost iRemaining bits
-                FIELDTYPE iPartLeft = m_pArray[fields.quot+1] << (m_iFieldSize-iRemaining); // clears all but iRemaining bits
-                iPartLeft = iPartLeft >> (m_iFieldSize-iRemaining);
-                iPartLeft = iPartLeft << iOffset;
-
-                FIELDTYPE iFieldValue = iPartLeft | iPartRight;
-
-                FIELDTYPE iOldValue = pDest[fields.quot+1];
-                iOldValue = iOldValue >> iBitsRemaining;
-                iOldValue = iOldValue << iBitsRemaining;
-
-                pDest[fields.quot+1] = iOldValue | iFieldValue;
-
-            }
-            /*
-            std::cout << "Having i: " << i << " and fields " << fields.quot << std::endl;
-            std::cout << "Using the last bits: " << iBitsRemaining << std::endl;
-            std::cout<< std::bitset<8>(pDest[fields.quot+1]) << " into field " << fields.quot+1 << " " << static_cast<void*>(pDest + fields.quot+1) << std::endl;
-            */
-        }
-
-/*
-        // how many bits remain?
-        if (iBitsRemaining > 0)
-        {
-
-            FIELDTYPE iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
-
-            iBitsRemaining -= iOffset;
-
-            FIELDTYPE iThisVal = 0;
-            iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
-            iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
-
-            if (this->m_iFields < fields.quot+1)
-            {
-                iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining); // TODO can this field value exist?
-            }
-
-            //FIELDTYPE  iThisVal = m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
-            //iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
-
-            FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
-            iOldVal = iOldVal << iBitsRemaining;
-
-            // TODO copy into last field
-            pDest[fields.quot+1] = iOldVal | iThisVal;
-        }
-*/
-    }
-
-protected:
-
-    /**
-     * \return const reference to this
-     */
-    const UBigInt & self() { return *this; }
-
-
-    /**
-     *
-     * \brief initializes big int variable
-     * \param bZero if set true, the big int value is set to 0
-     *
-     */
-    void initialize(uint32_t iBits)
-    {
-
-        if (iBits == 0)
-            return;
-
-        m_iBits = iBits;
-        m_iFields = std::ceil( iBits / (8.0f*sizeof(FIELDTYPE)) );
-
-        m_pArray = new FIELDTYPE[m_iFields];
-
-        // NULLING the array
-        for (uint32_t i = 0; i < m_iFields; ++i)
-            m_pArray[i] = 0;
-
-
-        m_iUnusedBitsMask = this->createUnusedBitsMask();
-
-    }
-
-    /**
-     *
-     * @return mask of bits in fieldtype that are unused (e.g. 11100000 if last 3 bits are unused)
-     */
-    FIELDTYPE createUnusedBitsMask()
-    {
-        FIELDTYPE iUnusedBitsMask = 0;
-
-        uint32_t iRemainingBits = m_iFields * sizeof(FIELDTYPE) * 8 - m_iBits;
-
-        const uint32_t stop = m_iFieldSize - iRemainingBits;
-
-        for (uint32_t i = 0; i < stop; ++i)
-            iUnusedBitsMask = (iUnusedBitsMask << 1) | 1;
-
-        iUnusedBitsMask = ~iUnusedBitsMask;
-
-        return iUnusedBitsMask;
-    }
-
-    /**
-     * sets the posinfield-th bit in the iFields-th field to value iValue [0,1]
-     * \param iField
-     * \param iPosInField
-     * \param iValue
-     */
-    void setBitDirect( uint64_t iField, uint8_t iPosInField, uint8_t iValue )
-    {
-        if (iValue == 0)
-        {
-
-            FIELDTYPE iFieldValue = m_pArray[iField];
-            iFieldValue &= ~(1 << iPosInField);
-            m_pArray[iField] = iFieldValue;
-
-        } else {
-
-            FIELDTYPE iFieldValue = m_pArray[iField];
-            iFieldValue |= (1 << iPosInField);
-            m_pArray[iField] = iFieldValue;
-
-        }
-    }
-
 
     void shiftLeft( uint32_t iShift)
     {
@@ -1022,6 +884,299 @@ protected:
 
         m_pArray[m_iFields-1] = (m_pArray[m_iFields-1] >> iShift);
     }
+
+    /**
+     *
+     * @param pSrc destination array
+     * @param iBitStart offset in first field of pSrc
+     * @param iBitCount how many bits to copy
+     */
+    void copy_content_to_array(FIELDTYPE* pDest, uint32_t iBitStart, uint32_t iBitCount)
+    {
+
+        // how many bits can I copy into first, not fully occupied field?
+        uint8_t iOffset = iBitStart % m_iFieldSize;
+
+        // TODO copy first field
+        FIELDTYPE iThisVal = m_pArray[0] << iOffset;
+        FIELDTYPE iOldVal = pDest[0] << (m_iFieldSize - iOffset);
+        iOldVal = iOldVal >> (m_iFieldSize - iOffset);
+
+        pDest[0] = iThisVal | iOldVal;
+
+        // how many bits remain to be copied?
+        uint32_t iBitsRemaining = iBitCount - (m_iFieldSize - iOffset);
+        // how many full fields are this?
+        div_t fields = div(iBitsRemaining, m_iFieldSize);
+
+        // copy full fields over
+        FIELDTYPE iPartRight;
+        FIELDTYPE iPartLeft;
+
+        uint32_t i = 0;
+        for ( i = 0; i < fields.quot; ++i)
+        {
+            // TODO copy full fields
+            iPartRight = m_pArray[i] >> (m_iFieldSize-iOffset);
+            iPartLeft = m_pArray[i+1] << iOffset;
+            iThisVal = iPartLeft | iPartRight;
+
+            pDest[i+1] = iThisVal;
+
+            iBitsRemaining -= m_iFieldSize;
+        }
+
+        if (iBitsRemaining > 0)
+        {
+            if (iBitsRemaining <= iOffset)
+            {
+
+                // we do not need a rest from the next field
+                iPartRight = m_pArray[fields.quot] << (m_iFieldSize-iOffset);
+                iPartRight = iPartRight << (iOffset-iBitsRemaining);
+                iPartRight = iPartRight >> (iOffset-iBitsRemaining);
+                iPartRight = iPartRight >> m_iFieldSize-iOffset;
+
+                iOldVal = pDest[fields.quot+1];
+                iOldVal = iOldVal >> iBitsRemaining;
+                iOldVal = iOldVal << iBitsRemaining;
+
+                pDest[fields.quot+1] = iOldVal | iPartRight;
+
+            } else {
+
+                // we need a rest from the next field
+                iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+
+                uint32_t iRemaining = iBitsRemaining - iOffset;
+
+                // need the rightmost iRemaining bits
+                iPartLeft = m_pArray[fields.quot+1] << (m_iFieldSize-iRemaining); // clears all but iRemaining bits
+                iPartLeft = iPartLeft >> (m_iFieldSize-iRemaining);
+                iPartLeft = iPartLeft << iOffset;
+
+                iThisVal = iPartLeft | iPartRight;
+
+                iOldVal = pDest[fields.quot+1];
+                iOldVal = iOldVal >> iBitsRemaining;
+                iOldVal = iOldVal << iBitsRemaining;
+
+                pDest[fields.quot+1] = iOldVal | iThisVal;
+
+            }
+            /*
+            std::cout << "Having i: " << i << " and fields " << fields.quot << std::endl;
+            std::cout << "Using the last bits: " << iBitsRemaining << std::endl;
+            std::cout<< std::bitset<8>(pDest[fields.quot+1]) << " into field " << fields.quot+1 << " " << static_cast<void*>(pDest + fields.quot+1) << std::endl;
+            */
+        }
+
+
+
+/*
+        // how many bits remain?
+        if (iBitsRemaining > 0)
+        {
+
+            FIELDTYPE iPartRight = m_pArray[fields.quot] >> (m_iFieldSize-iOffset);
+
+            iBitsRemaining -= iOffset;
+
+            FIELDTYPE iThisVal = 0;
+            iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
+            iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
+
+            if (this->m_iFields < fields.quot+1)
+            {
+                iThisVal |= m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining); // TODO can this field value exist?
+            }
+
+            //FIELDTYPE  iThisVal = m_pArray[fields.quot+1] << (m_iFieldSize-iBitsRemaining);
+            //iThisVal = iThisVal >> (m_iFieldSize-iBitsRemaining);
+
+            FIELDTYPE iOldVal = pDest[fields.quot+1] >> iBitsRemaining;
+            iOldVal = iOldVal << iBitsRemaining;
+
+            // TODO copy into last field
+            pDest[fields.quot+1] = iOldVal | iThisVal;
+        }
+*/
+    }
+
+    /**
+ *
+ * @brief copies x bits from another instance to this instance
+ * @param pSrc the source field
+ * @param iBitStart start in pSrc field. Next bit will be first bit in this instance
+ * @param iBitCount bitcount
+ *
+ */
+    void copy_content_bits(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
+    {
+
+        uint8_t iOffset = iBitStart % m_iFieldSize;
+
+        if (iOffset == 0)
+        {
+
+            this->copy_content_from_be(pSrc, iBitCount);
+
+        } else {
+
+            uint32_t iRemainingBits = iBitCount;
+            div_t fields = div(iRemainingBits, m_iFieldSize);
+
+            //
+            FIELDTYPE iPartOne;
+            FIELDTYPE iPartTwo;
+            FIELDTYPE iFieldValue;
+            for (uint32_t i = 0;  i < fields.quot; ++i)
+            {
+
+                iPartOne = pSrc[i] >> iOffset;
+                iPartTwo = pSrc[i+1] << (m_iFieldSize-iOffset);
+                iFieldValue = iPartOne | iPartTwo;
+
+                /*
+                std::cout << "i   " << std::bitset<8>(pSrc[i]) << " " << static_cast<void*>(pSrc + i) << std::endl;
+                std::cout << "i+1 " << std::bitset<8>(pSrc[i+1]) << " " << static_cast<void*>(pSrc + i+1) << std::endl;
+                std::cout<<std::bitset<8>(iFieldValue)<< " from field " << i << " " << static_cast<void*>(pSrc + i) << std::endl;
+                 */
+
+                m_pArray[i] = iPartOne | iPartTwo;
+
+                iRemainingBits -= m_iFieldSize;
+
+            }
+
+            if (iRemainingBits > 0)
+            {
+                uint8_t iUnusedBits = (iBitStart+iBitCount) % m_iFieldSize;
+                uint8_t iMissingBits = iBitCount % m_iFieldSize;
+
+                /*
+                if (iMissingBits != iRemainingBits)
+                    std::cerr << "offset " << std::to_string(iOffset) << " and field size-remain inqueal " << std::to_string(m_iFieldSize-iRemainingBits) << std::endl;
+                */
+
+                FIELDTYPE iPart = pSrc[fields.quot];
+
+                iPart = iPart << (m_iFieldSize-iOffset-iRemainingBits);
+                iPart = iPart >> (m_iFieldSize-iOffset-iRemainingBits);
+
+                iPart = iPart >> iOffset;
+
+                //FIELDTYPE iPart = pSrc[fields.quot] >> (m_iFieldSize-iRemainingBits);
+                //iPart = iPart << (m_iFieldSize-iRemainingBits);
+                //iPart = iPart >> iOffset;
+
+                m_pArray[fields.quot] = iPart;
+
+            }
+
+        }
+    }
+
+    /**
+     *
+     * \brief copies content from one bigint to other (starts at least)
+     * \note copies least significant bytes only!
+     * \param oOther Other big int to copy stuff from
+     */
+    void copy_content(const UBigInt & oOther)
+    {
+
+        uint32_t iMinBits = std::min(oOther.m_iBits, this->m_iBits);
+        this->copy_content_bits(oOther.m_pArray, 0, iMinBits);
+
+    }
+
+protected:
+
+    /**
+     * \return const reference to this
+     */
+    const UBigInt & self() { return *this; }
+
+
+    /**
+     *
+     * \brief initializes big int variable
+     * \param bZero if set true, the big int value is set to 0
+     *
+     */
+    void initialize(uint32_t iBits, MemoryPool<FIELDTYPE>* pPool=NULL)
+    {
+
+        if (pPool != NULL)
+        {
+            m_pPool = pPool;
+        }
+
+        if (iBits == 0)
+            return;
+
+        m_iBits = iBits;
+        m_iFields = std::ceil( iBits / (8.0f*sizeof(FIELDTYPE)) );
+
+        m_oAlloc = m_pPool->malloc(m_iFields);
+        m_pArray = (FIELDTYPE*) m_oAlloc.addr;
+
+        // NULLING the array
+        for (uint32_t i = 0; i < m_iFields; ++i)
+            m_pArray[i] = 0;
+
+
+        m_iUnusedBitsMask = this->createUnusedBitsMask();
+
+    }
+
+    /**
+     *
+     * @return mask of bits in fieldtype that are unused (e.g. 11100000 if last 3 bits are unused)
+     */
+    FIELDTYPE createUnusedBitsMask()
+    {
+        FIELDTYPE iUnusedBitsMask = 0;
+
+        uint32_t iRemainingBits = m_iFields * sizeof(FIELDTYPE) * 8 - m_iBits;
+
+        const uint32_t stop = m_iFieldSize - iRemainingBits;
+
+        for (uint32_t i = 0; i < stop; ++i)
+            iUnusedBitsMask = (iUnusedBitsMask << 1) | 1;
+
+        iUnusedBitsMask = ~iUnusedBitsMask;
+
+        return iUnusedBitsMask;
+    }
+
+    /**
+     * sets the posinfield-th bit in the iFields-th field to value iValue [0,1]
+     * \param iField
+     * \param iPosInField
+     * \param iValue
+     */
+    void setBitDirect( uint64_t iField, uint8_t iPosInField, uint8_t iValue )
+    {
+        if (iValue == 0)
+        {
+
+            FIELDTYPE iFieldValue = m_pArray[iField];
+            iFieldValue &= ~(1 << iPosInField);
+            m_pArray[iField] = iFieldValue;
+
+        } else {
+
+            FIELDTYPE iFieldValue = m_pArray[iField];
+            iFieldValue |= (1 << iPosInField);
+            m_pArray[iField] = iFieldValue;
+
+        }
+    }
+
+
+
 
     void bitAnd(const UBigInt & oOther)
     {
@@ -1170,10 +1325,12 @@ protected:
 
     void reset()
     {
+
         if (m_pArray != NULL)
         {
-            delete m_pArray;
-            m_pArray == NULL;
+            m_pPool->free(m_oAlloc);
+            m_oAlloc.addr = NULL;
+            m_pArray = NULL;
         }
 
     }
@@ -1187,24 +1344,27 @@ protected:
     void copy_content_from_be(FIELDTYPE* pSrc, uint64_t iLength)
     {
 
+        /*
         if (this->m_iBits < iLength)
             throw new UBigIntNotLargeEnough(this, iLength);
+        */
 
         const uint8_t iFields = std::ceil( iLength / m_iFieldSize );
         const div_t fields = div(iLength, m_iFieldSize);
 
         uint8_t i = 0;
+        FIELDTYPE iInsert;
         for (i = 0; i < fields.quot; ++i)
         {
-            FIELDTYPE iInsert = pSrc[i];
+            iInsert = pSrc[i];
             m_pArray[i] = iInsert;
         }
 
         if (fields.rem > 0)
         {
 
-            FIELDTYPE iPart = pSrc[fields.quot] << (m_iFieldSize-fields.rem);
-            m_pArray[ fields.quot ] = iPart >> (m_iFieldSize-fields.rem);
+            iInsert = pSrc[fields.quot] << (m_iFieldSize-fields.rem);
+            m_pArray[ fields.quot ] = iInsert >> (m_iFieldSize-fields.rem);
 
         }
 
@@ -1379,91 +1539,7 @@ protected:
     }
 
 
-    /**
-     *
-     * @brief copies x bits from another instance to this instance
-     * @param pSrc the source field
-     * @param iBitStart start in pSrc field. Next bit will be first bit in this instance
-     * @param iBitCount bitcount
-     *
-     */
-    void copy_content_bits(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
-    {
 
-        uint8_t iOffset = iBitStart % m_iFieldSize;
-
-        if (iOffset == 0)
-        {
-
-            this->copy_content_from_be(pSrc, iBitCount);
-
-        } else {
-
-            uint32_t iRemainingBits = iBitCount;
-            div_t fields = div(iRemainingBits, m_iFieldSize);
-
-            //
-            for (uint32_t i = 0;  i < fields.quot; ++i)
-            {
-
-                FIELDTYPE iPartOne = pSrc[i] >> iOffset;
-                FIELDTYPE iPartTwo = pSrc[i+1] << (m_iFieldSize-iOffset);
-
-                FIELDTYPE iFieldValue = iPartOne | iPartTwo;
-
-                /*
-                std::cout << "i   " << std::bitset<8>(pSrc[i]) << " " << static_cast<void*>(pSrc + i) << std::endl;
-                std::cout << "i+1 " << std::bitset<8>(pSrc[i+1]) << " " << static_cast<void*>(pSrc + i+1) << std::endl;
-                std::cout<<std::bitset<8>(iFieldValue)<< " from field " << i << " " << static_cast<void*>(pSrc + i) << std::endl;
-                 */
-
-                m_pArray[i] = iPartOne | iPartTwo;
-
-                iRemainingBits -= m_iFieldSize;
-
-            }
-
-            if (iRemainingBits > 0)
-            {
-                uint8_t iUnusedBits = (iBitStart+iBitCount) % m_iFieldSize;
-                uint8_t iMissingBits = iBitCount % m_iFieldSize;
-
-                /*
-                if (iMissingBits != iRemainingBits)
-                    std::cerr << "offset " << std::to_string(iOffset) << " and field size-remain inqueal " << std::to_string(m_iFieldSize-iRemainingBits) << std::endl;
-                */
-
-                FIELDTYPE iPart = pSrc[fields.quot];
-
-                iPart = iPart << (m_iFieldSize-iOffset-iRemainingBits);
-                iPart = iPart >> (m_iFieldSize-iOffset-iRemainingBits);
-
-                iPart = iPart >> iOffset;
-
-                //FIELDTYPE iPart = pSrc[fields.quot] >> (m_iFieldSize-iRemainingBits);
-                //iPart = iPart << (m_iFieldSize-iRemainingBits);
-                //iPart = iPart >> iOffset;
-
-                m_pArray[fields.quot] = iPart;
-
-            }
-
-        }
-    }
-
-    /**
-     *
-     * \brief copies content from one bigint to other (starts at least)
-     * \note copies least significant bytes only!
-     * \param oOther Other big int to copy stuff from
-     */
-    void copy_content(const UBigInt & oOther)
-    {
-
-        uint32_t iMinBits = std::min(oOther.m_iBits, this->m_iBits);
-        this->copy_content_bits(oOther.m_pArray, 0, iMinBits);
-
-    }
 
     uint32_t m_iBits = 0;
     uint32_t m_iFields = 0;
@@ -1473,6 +1549,9 @@ protected:
 
     FIELDTYPE m_iUnusedBitsMask;
 
+
+    MemoryPool<FIELDTYPE>* m_pPool=NULL;
+    MemLoc m_oAlloc;
 };
 
 

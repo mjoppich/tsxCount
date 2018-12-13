@@ -75,25 +75,46 @@ public:
 
             bEmpty = positionEmpty(iPos);
 
+            //std::cout << "Empty position " << (int) bEmpty << std::endl;
+
             if (bEmpty) {
 
                 TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
                 TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
 
                 // no overflow can happen here ...
-                CIncrementElement incRet = this->incrementElement(iPos, key, iReprobes, false);
+                CIncrementElement oINC = this->incrementElement(iPos, key, iReprobes, false);
+                CIncrementElement* pINC = &(oINC);
+                TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
+                TSX::tsx_keyval_t* pSavedKey = &savedkey;
+
+                int iinc=0;
 
                 uint status = _xbegin();
                 if(status == _XBEGIN_STARTED) {
-                    this->performIncrement(&incRet);
 
-                    // compare elements
-                    bool elemsEqual = this->getElement(incRet.iPosition) == incRet.keyval;
+                    //this->performIncrement(&incRet);
+                    // increment element
+
+                    bool elemsEqual=true;
+                    uint64_t iBitsToPos = (pINC->iPosition)*m_iKeyValBits;
+                    uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE)*8);
+                    uint32_t iStartOffset = iBitsToPos-((sizeof(FIELDTYPE)*8) * iStartPos);
+
+
+                    FIELDTYPE* pPos = m_pCounterArray + iStartPos;
+                    pSavedKey->copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
+
+                    // check elements are equal
+                    elemsEqual = pSavedKey->isEqual(pSavedKey, &(pINC->original), m_iKeyValBits);
 
                     if (!elemsEqual)
                     {
                         _xabort(0xff);
                     }
+
+                    //oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
+                    pINC->keyval.copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
 
                     // transaction completes here
                     _xend();
@@ -110,13 +131,15 @@ public:
 
 
 
-
                 if (status != _XBEGIN_STARTED) {
                     //std::cout << "STATUS ERROR " << (uint) status << std::endl;
                     if (_XABORT_CODE(status)==0xff)
                     {
                         ++iAborts;
+                    } else {
+                        //std::cout << "unknown abort empty " << (int) status << std::endl;
                     }
+
                     // transaction aborted
                     // => retry
                     continue;
@@ -161,6 +184,9 @@ public:
                     }
                      */
 
+                    TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
+                    TSX::tsx_keyval_t* pSavedKey = &savedkey;
+
                     int iAbort = 0;
                     uint status = _xbegin();
 
@@ -170,7 +196,20 @@ public:
 
                             CIncrementElement* pINC = &(vOPS.data()[i]);
 
-                            bool elemsEqual = this->getElement(pINC->iPosition) == pINC->original;
+
+                            std::div_t oStartPos;
+                            FIELDTYPE* pPos;
+                            bool elemsEqual;
+
+                            // get element
+                            uint32_t iBitsPerField = sizeof(FIELDTYPE) * 8;
+                            uint64_t iDivPos = pINC->iPosition * m_iKeyValBits;
+                            oStartPos = udiv( iDivPos, iBitsPerField);
+                            pPos = m_pCounterArray + oStartPos.quot;
+                            pSavedKey->copy_content_bits(pPos, (uint32_t) oStartPos.rem, m_iKeyValBits);
+
+                            // compare with original value
+                            elemsEqual = pSavedKey->isEqual(pSavedKey, &(pINC->original), m_iKeyValBits);
 
                             if (!elemsEqual)
                             {
@@ -178,27 +217,12 @@ public:
                                 _xabort(0xff);
                             }
 
+                            // increment element
                             // we want to get the iPosition-th entry
-                            std::div_t oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
-
-                            //UBigInt oReturn(m_iKeyValBits);
-                            //UBigInt::storeIntoMemory(m_pCounterArray, (uint32_t) oStartPos.quot, (uint32_t) oStartPos.rem, pINC->keyval, m_iKeyValBits);
-                            FIELDTYPE* pPos = m_pCounterArray + oStartPos.quot;
                             pINC->keyval.copy_content_to_array(pPos, oStartPos.rem, m_iKeyValBits);
-
-                            // compare elements
-                            elemsEqual = this->getElement(pINC->iPosition) == pINC->keyval;
-
-                            if (!elemsEqual)
-                            {
-                                //iAbort = 1;
-                                _xabort(0xff);
-                            }
                         }
 
                         _xend();
-
-
 
                         this->iAddCount += 1;
                         bInserted = true;
@@ -211,7 +235,10 @@ public:
                         if (_XABORT_CODE(status)==0xff)
                         {
                             ++iAborts;
+                        } else {
+                            //std::cout << "unknown abort filled " << (int) status << std::endl;
                         }
+
                         // transaction aborted
                         // => retry
 
@@ -246,6 +273,8 @@ public:
 
 
         }
+
+        //std::cout << "Inserted element" << std::endl;
 
         if (!bInserted)
         {

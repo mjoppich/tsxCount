@@ -78,8 +78,8 @@ class BijectiveKMapping : public IBijectiveFunction {
 
 public:
 
-    BijectiveKMapping(uint32_t iK)
-    : m_iK(iK), m_matN(2*iK)
+    BijectiveKMapping(uint32_t iK, MemoryPool<FIELDTYPE>* pPool)
+    : m_pPool(pPool), m_iK(iK), m_matN(2*iK)
     {
         srand(time(NULL));
 
@@ -201,7 +201,7 @@ protected:
 
     UBigInt applyto(UBigInt& oValue, UBigInt* pRows)
     {
-        UBigInt oReturn(m_matN, true);
+        UBigInt oReturn(m_matN, true, this->m_pPool);
 
         for (uint32_t i = 0; i < m_matN; ++i)
         {
@@ -224,12 +224,12 @@ protected:
 
     UBigInt* matrixToRows( int8_t* pMatrix) {
 
-        UBigInt* pReturn = new UBigInt[m_iK * 2];
+        UBigInt* pReturn = (UBigInt*) ::malloc(sizeof(UBigInt) * 2* m_iK);//new UBigInt[m_iK * 2];
 
         for (uint32_t i = 0; i < m_iK * 2; ++i)
         {
-
-            pReturn[i].resize(m_iK*2);
+            pReturn[i] = UBigInt(m_iK*2, true, m_pPool);
+            //pReturn[i].resize(m_iK*2);
             //memcpy(pReturn + i, &oRet, sizeof(UBigInt));
 
             //pReturn[i] = oRet;
@@ -796,6 +796,7 @@ protected:
     const uint32_t m_iK;
     const uint32_t m_matN;
 
+    MemoryPool<FIELDTYPE>* m_pPool;
 
     int8_t* m_pA;
     int8_t* m_pAi;
