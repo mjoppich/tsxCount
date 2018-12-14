@@ -51,13 +51,14 @@ IF(OPENMP_FOUND)
     # add flags for OpenMP
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    add_compile_options("-mrtm")
-    add_compile_options("-fopenmp")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${OpenMP_SHARED_LINKER_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 ELSE()
     message("Missed OpenMP!")
 ENDIF()
+
+MESSAGE(WARNING ${OpenMP_C_FLAGS})
+MESSAGE(WARNING ${OpenMP_CXX_FLAGS})
 
 SET( CMAKE_OPENMP_LIBRARY_NAME omp)
 
@@ -165,7 +166,7 @@ file(GLOB tsxCountOMP_SRC
 ADD_EXECUTABLE(tsxCountOMP ${tsxCountOMP_SRC} ${tsxCountOMP_H})
 target_include_directories(tsxCountOMP PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCountOMP PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
-target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} -fopenmp)
+target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
 
 install(TARGETS tsxCountOMP DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
@@ -181,7 +182,7 @@ file(GLOB tsxCountTSX_SRC
 ADD_EXECUTABLE(tsxCountTSX ${tsxCountTSX_SRC} ${tsxCountTSX_H})
 target_include_directories(tsxCountTSX PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_compile_options(tsxCountTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm -fopenmp)
+target_compile_options(tsxCountTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${OpenMP_CXX_FLAGS})
 
 TARGET_LINK_LIBRARIES(tsxCountTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountTSX DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
