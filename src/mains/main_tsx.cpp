@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     uint32_t itK = 8;
     TSXHashMapTSX* ptMap = new TSXHashMapTSX(8, 4, itK, 2);
 
-    testHashMap(ptMap, false);
+    testHashMap(ptMap, true);
 
 
     std::cerr << "Used fields: " << ptMap->getUsedPositions() << std::endl;
