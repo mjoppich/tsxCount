@@ -201,11 +201,14 @@ public:
                             FIELDTYPE* pPos;
                             bool elemsEqual;
 
-                            // get element
+
+                            // calc pos
                             uint32_t iBitsPerField = sizeof(FIELDTYPE) * 8;
                             uint64_t iDivPos = pINC->iPosition * m_iKeyValBits;
                             oStartPos = udiv( iDivPos, iBitsPerField);
                             pPos = m_pCounterArray + oStartPos.quot;
+
+                            // get element
                             pSavedKey->copy_content_bits(pPos, (uint32_t) oStartPos.rem, m_iKeyValBits);
 
                             // compare with original value
@@ -216,7 +219,6 @@ public:
                                 //iAbort = 1;
                                 _xabort(0xff);
                             }
-
                             // increment element
                             // we want to get the iPosition-th entry
                             pINC->keyval.copy_content_to_array(pPos, oStartPos.rem, m_iKeyValBits);

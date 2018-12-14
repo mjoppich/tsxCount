@@ -28,6 +28,8 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
 
 void testHashMap(TSXHashMap* pMap, bool parallel=false)
 {
+
+    /*
     UBigInt m_iKeyMask(128, true, pMap->getMemoryPool());
     uint64_t iBla = 0x8000000800000ULL;
     m_iKeyMask = UBigInt::createFromBitShift(128, 64, pMap->getMemoryPool());
@@ -60,7 +62,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
-
+    */
 
 
     UBigInt oTest ("110110010001", pMap->getMemoryPool());
