@@ -505,12 +505,12 @@ protected:
      */
     virtual uint8_t position_locked(uint64_t iArrayPos)
     {
-
+        return omp_get_thread_num();
     }
 
     virtual bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
-
+        return true;
     }
 
     /**

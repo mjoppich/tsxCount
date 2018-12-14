@@ -18,8 +18,8 @@ cmake_minimum_required(VERSION 3.1)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/add_cmake/")
 
-set(CMAKE_C_COMPILER_NAMES icc  gcc-8 clang gcc cc)
-set(CMAKE_CXX_COMPILER_NAMES icpc g++-8  clang++ g++ c++ cxx)
+set(CMAKE_C_COMPILER_NAMES gcc-8 gcc clang icc cc)
+set(CMAKE_CXX_COMPILER_NAMES g++-8 g++ clang++ icpc c++ cxx)
 
 SET (CMAKE_C_FLAGS                "-Wall -std=c99")
 SET (CMAKE_C_FLAGS_DEBUG          "-g")
@@ -58,6 +58,8 @@ IF(OPENMP_FOUND)
 ELSE()
     message("Missed OpenMP!")
 ENDIF()
+
+SET( CMAKE_OPENMP_LIBRARY_NAME omp)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -113,7 +115,7 @@ file(GLOB tsxutilslib_SRC
 
 add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h})
 target_include_directories(tsxutils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${Boost_INCLUDE_DIRS})
-TARGET_LINK_LIBRARIES(tsxutils gomp z Threads::Threads)
+TARGET_LINK_LIBRARIES(tsxutils gomp z ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
 
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)
@@ -133,7 +135,7 @@ file(GLOB tsxCount_SRC
         )
 ADD_EXECUTABLE(tsxCount ${tsxCount_SRC} ${tsxCount_H})
 target_include_directories(tsxCount PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils Threads::Threads)
+TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
 install(TARGETS tsxCount DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 
@@ -147,7 +149,7 @@ file(GLOB tsxCountPTHREAD_SRC
         )
 ADD_EXECUTABLE(tsxCountPThread ${tsxCountPTHREAD_SRC} ${tsxCountPTHREAD_H})
 target_include_directories(tsxCountPThread PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-TARGET_LINK_LIBRARIES(tsxCountPThread PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter tsxutils Threads::Threads)
+TARGET_LINK_LIBRARIES(tsxCountPThread PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
 install(TARGETS tsxCountPThread DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 
@@ -162,7 +164,7 @@ file(GLOB tsxCountOMP_SRC
         )
 ADD_EXECUTABLE(tsxCountOMP ${tsxCountOMP_SRC} ${tsxCountOMP_H})
 target_include_directories(tsxCountOMP PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-TARGET_LINK_LIBRARIES(tsxCountOMP PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter omp tsxutils Threads::Threads)
+TARGET_LINK_LIBRARIES(tsxCountOMP PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
 target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} -fopenmp)
 
 install(TARGETS tsxCountOMP DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
@@ -181,5 +183,5 @@ target_include_directories(tsxCountTSX PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_compile_options(tsxCountTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm -fopenmp)
 
-TARGET_LINK_LIBRARIES(tsxCountTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils omp Threads::Threads )
+TARGET_LINK_LIBRARIES(tsxCountTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountTSX DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
