@@ -18,8 +18,8 @@ cmake_minimum_required(VERSION 3.1)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/add_cmake/")
 
-set(CMAKE_C_COMPILER_NAMES gcc-8 gcc clang icc cc)
-set(CMAKE_CXX_COMPILER_NAMES g++-8 g++ clang++ icpc c++ cxx)
+set(CMAKE_C_COMPILER_NAMES icc gcc-8 gcc clang icc cc)
+set(CMAKE_CXX_COMPILER_NAMES icpc g++-8 g++ clang++ icpc c++ cxx)
 
 SET (CMAKE_C_FLAGS                "-Wall -std=c99")
 SET (CMAKE_C_FLAGS_DEBUG          "-g")
@@ -59,7 +59,7 @@ ELSE()
     message("Missed OpenMP!")
 ENDIF()
 
-SET( CMAKE_OPENMP_LIBRARY_NAME omp)
+SET( CMAKE_OPENMP_LIBRARY_NAME "")
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
