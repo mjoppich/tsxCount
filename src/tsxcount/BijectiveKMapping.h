@@ -91,7 +91,7 @@ public:
             throw BijectiveMappingNoInverseException(this);
         }
 
-        std::cout << this->printMatrix(m_pA) << std::endl;
+        //std::cout << this->printMatrix(m_pA) << std::endl;
 
         m_pArows = this->matrixToRows(m_pA);
         m_pAirows = this->matrixToRows(m_pAi);
@@ -247,7 +247,7 @@ protected:
 
             }
 
-            std::cout << pReturn[i].to_string() << std::endl;
+            //std::cout << pReturn[i].to_string() << std::endl;
 
 
         }

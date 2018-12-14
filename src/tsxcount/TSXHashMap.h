@@ -113,6 +113,7 @@ public:
         m_mask_func_reprobe = ~m_mask_reprobe_func;
 
 
+        /*
         std::cerr << "Value Mask (value = 1) m_mask_value_key" << std::endl;
         std::cerr << m_mask_value_key.to_string() << std::endl;
 
@@ -124,7 +125,7 @@ public:
 
         std::cerr << "Func Mask (func = 1) m_mask_func_reprobe" << std::endl;
         std::cerr << m_mask_func_reprobe.to_string() << std::endl;
-
+        */
 
         m_pHashingFunction = new BijectiveKMapping(m_iK, this->m_pPool);
 

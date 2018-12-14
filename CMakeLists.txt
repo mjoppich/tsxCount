@@ -18,29 +18,27 @@ cmake_minimum_required(VERSION 3.1)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/add_cmake/")
 
-set(CMAKE_C_COMPILER_NAMES gcc-8 gcc clang icc cc)
-set(CMAKE_CXX_COMPILER_NAMES g++-8 g++ clang++ icpc c++ cxx)
-
-SET (CMAKE_C_FLAGS                "-Wall -std=c99")
-SET (CMAKE_C_FLAGS_DEBUG          "-g")
-SET (CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
-SET (CMAKE_C_FLAGS_RELEASE        "-O4 -DNDEBUG")
-SET (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
-
-SET (CMAKE_CXX_FLAGS                "-Wall")
-SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
-SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
-set(CMAKE_CXX_STANDARD 11)
-
+set(CMAKE_C_COMPILER_NAMES icc gcc-8 gcc clang icc cc)
+set(CMAKE_CXX_COMPILER_NAMES icpc g++-8 g++ clang++ icpc c++ cxx)
 
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 project (tsxCount)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
+SET (CMAKE_C_FLAGS                "-Wall -std=c99 ${OpenMP_C_FLAGS}")
+SET (CMAKE_C_FLAGS_DEBUG          "-g")
+SET (CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
+SET (CMAKE_C_FLAGS_RELEASE        "-O4 -DNDEBUG")
+SET (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
 
+SET (CMAKE_CXX_FLAGS                "-Wall ${OpenMP_CXX_FLAGS}")
+SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
+SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
+SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
+SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -57,13 +55,31 @@ ELSE()
     message("Missed OpenMP!")
 ENDIF()
 
+
+
+
 MESSAGE(WARNING ${OpenMP_C_FLAGS})
 MESSAGE(WARNING ${OpenMP_CXX_FLAGS})
 
-SET( CMAKE_OPENMP_LIBRARY_NAME omp)
+#SET( OpenMP_CXX_FLAGS "-fopenmp" )
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    # using Clang
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    # using GCC
+    SET( CMAKE_OPENMP_LIBRARY_NAME "omp")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+    # using Intel C++
+    SET( CMAKE_OPENMP_LIBRARY_NAME "")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    # using Visual Studio C++
+endif()
+
+
+MESSAGE(WARNING ${CMAKE_OPENMP_LIBRARY_NAME})
+
+
+
 
 MESSAGE(WARNING ${CMAKE_SYSTEM_NAME})
 
@@ -116,7 +132,7 @@ file(GLOB tsxutilslib_SRC
 
 add_library(tsxutils ${tsxutilslib_SRC} ${tsxutilslib_h})
 target_include_directories(tsxutils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${Boost_INCLUDE_DIRS})
-TARGET_LINK_LIBRARIES(tsxutils gomp z ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
+TARGET_LINK_LIBRARIES(tsxutils z ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
 
 target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)
