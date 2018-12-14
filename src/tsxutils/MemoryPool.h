@@ -10,6 +10,7 @@
 #include <omp.h>
 #include <vector>
 #include <iostream>
+#include <thread>
 
 template <class T>
 class MemoryPool;
@@ -70,6 +71,7 @@ public:
         // to avoid resize
         this->m_vHeap.reserve(elements);
         this->m_vHeap.push_back(elem);
+        this->m_iInitialSize = elements;
     }
 
     ~MemoryPatch()
@@ -95,18 +97,51 @@ public:
 
                 if (oit->ilength == 0)
                 {
-                    m_vHeap.erase(oit);
+                    this->eraseIt(oit);
                 }
 
                 std::vector<MemLoc>::iterator oins = m_vHeap.insert(oit, newelem);
 
-                long d = std::distance(m_vHeap.begin(), oins);
+                //std::cout << m_vHeap[m_vHeap.size()-1].ilength << " " << m_vHeap[m_vHeap.size()-1].addr << std::endl;
+
+                //long d = std::distance(m_vHeap.begin(), oins);
 
                 return newelem;
             }
         }
 
+
+        size_t iCnt=0;
+        for (auto elem : this->m_vHeap)
+        {
+            iCnt += elem.ilength;
+        }
+
+        std::cerr << omp_get_thread_num() << " " << std::this_thread::get_id() << " Total element count " << iCnt << std::endl;
+
         throw new MemoryPoolException<T>(NULL, "Unable to allocate memory.");
+
+    }
+
+    void eraseIt(std::vector<MemLoc>::iterator& oit)
+    {
+        long d = std::distance(m_vHeap.begin(), oit);
+        m_vHeap.erase(oit);
+    }
+
+    void printLoadOut()
+    {
+        size_t iCnt=0;
+        for (auto elem : this->m_vHeap)
+        {
+            iCnt += elem.ilength;
+        }
+
+        if (iCnt != this->m_iInitialSize)
+        {
+            std::cout << "error" << std::endl;
+            std::cerr << omp_get_thread_num() << " " << std::this_thread::get_id() << " LOADOUT Total element count " << iCnt << std::endl;
+        }
 
     }
 
@@ -127,19 +162,23 @@ public:
                     m_vHeap[d+1].addr = oElem.addr;
                     m_vHeap[d+1].ilength += oElem.ilength;
 
-                    m_vHeap.erase(oit);
+                    this->eraseIt(oit);
+                    this->printLoadOut();
 
                     return;
                 } else if ((d >= 1) && (m_vHeap[d-1].free == true)) {
 
                     //std::cerr << "Freeing memory " << oElem.addr << std::endl;
                     m_vHeap[d-1].ilength += oElem.ilength;
-                    m_vHeap.erase(oit);
+                    this->eraseIt(oit);
+                    this->printLoadOut();
+
                     return;
                 } else {
 
                     //std::cerr << "Freeing memory " << oElem.addr << std::endl;
                     m_vHeap[d].free = true;
+                    this->printLoadOut();
                     return;
                 }
             }
@@ -154,7 +193,7 @@ protected:
 
     T* m_pHeap;
     std::vector<MemLoc> m_vHeap;
-
+    size_t m_iInitialSize;
 };
 
 template <class T>

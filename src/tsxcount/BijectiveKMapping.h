@@ -206,13 +206,15 @@ protected:
         for (uint32_t i = 0; i < m_matN; ++i)
         {
 
-            UBigInt oRes = pRows[i] & oValue; // was ^ for whatever reason? (XOR)
+            UBigInt oTmp(pRows[i], this->m_pPool);
+            oTmp.bitAnd(oValue);
+            //oRes = pRows[i] & oValue; // was ^ for whatever reason? (XOR)
 
             //std::cerr << pRows[i].to_string() << std::endl;
             //std::cerr << oValue.to_string() << std::endl;
             //std::cerr << oRes.to_string() << std::endl;
 
-            uint32_t iBitSum = oRes.sumBits();
+            uint32_t iBitSum = oTmp.sumBits();
 
             oReturn.setBit(m_matN-1-i, iBitSum % 2);
 
@@ -228,7 +230,9 @@ protected:
 
         for (uint32_t i = 0; i < m_iK * 2; ++i)
         {
-            pReturn[i] = UBigInt(m_iK*2, true, m_pPool);
+            UBigInt newElem(m_iK*2, true, m_pPool);
+            newElem.transferSelf(pReturn+i);
+
             //pReturn[i].resize(m_iK*2);
             //memcpy(pReturn + i, &oRet, sizeof(UBigInt));
 

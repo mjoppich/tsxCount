@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <cstring>
 
 #include <cmath>
 
@@ -273,6 +274,12 @@ public:
 
     UBigInt(UBigInt & oOther, uint32_t iBits )
             : UBigInt(iBits, true, oOther.m_pPool)
+    {
+        copy_content(oOther);
+    }
+
+    UBigInt(UBigInt & oOther, MemoryPool<FIELDTYPE>* pPool)
+            : UBigInt(oOther.m_iBits, true, pPool)
     {
         copy_content(oOther);
     }
@@ -556,6 +563,18 @@ public:
         bool result = (thisRemain == otherRemain);
 
         return result;
+    }
+
+    void transferSelf(UBigInt* pLoc)
+    {
+        ::memcpy(pLoc, this, sizeof(UBigInt));
+
+        this->m_pArray = NULL;
+        //std::cout << "transfer complete" << std::endl;
+
+        this->initialize(m_iBits);
+
+        //std::cout << "transfer complete reinit" << std::endl;
     }
 
     bool restZero(const UBigInt* pElement, uint32_t iOffsetBits)
@@ -1091,6 +1110,35 @@ public:
 
     }
 
+    void bitAnd(const UBigInt & oOther)
+    {
+        const FIELDTYPE* pOtherField = oOther.m_pArray;
+        const uint32_t iMaxField = oOther.m_iFields;
+
+        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
+
+            if (iField < iMaxField)
+                return (FIELDTYPE) (iValue & pOtherField[iField]);
+
+            return (FIELDTYPE) 0;
+        } );
+
+    }
+
+    void bitOr(const UBigInt & oOther)
+    {
+
+        const FIELDTYPE* pOtherField = oOther.m_pArray;
+        const uint32_t iMaxField = oOther.m_iFields;
+
+        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
+
+            return (iField < iMaxField) ? (iValue | pOtherField[iField]) : iValue;
+
+        } );
+
+    }
+
 protected:
 
     /**
@@ -1178,34 +1226,7 @@ protected:
 
 
 
-    void bitAnd(const UBigInt & oOther)
-    {
-        const FIELDTYPE* pOtherField = oOther.m_pArray;
-        const uint32_t iMaxField = oOther.m_iFields;
 
-        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
-
-            if (iField < iMaxField)
-                return (FIELDTYPE) (iValue & pOtherField[iField]);
-
-            return (FIELDTYPE) 0;
-        } );
-
-    }
-
-    void bitOr(const UBigInt & oOther)
-    {
-
-        const FIELDTYPE* pOtherField = oOther.m_pArray;
-        const uint32_t iMaxField = oOther.m_iFields;
-
-        this->applyToAllFields( [pOtherField, iMaxField] (FIELDTYPE iValue, uint32_t iField) {
-
-            return (iField < iMaxField) ? (iValue | pOtherField[iField]) : iValue;
-
-        } );
-
-    }
 
     void bitXor(const UBigInt & oOther)
     {

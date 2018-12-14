@@ -105,16 +105,18 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
 #pragma omp parallel num_threads(threads)
     {
+        int iThreadCount = omp_get_num_threads();
 
 #pragma omp master
         {
-            std::cerr << "Parellel=" << parallel << " Running on " << omp_get_num_threads() << " threads on map configured for " << pMap->getThreads() << std::endl;
+            std::cerr << "Parellel=" << parallel << " Running on " << iThreadCount << " threads on map configured for " << pMap->getThreads() << std::endl;
         }
 
 #pragma omp barrier
 
         #pragma omp for private(i)
         for (i = 0; i < iMaxCount; ++i) {
+
 
             //std::cerr << "Thread " << omp_get_thread_num() << " adding kmer: " << oKmer1.to_string() << " " << std::to_string(i) << std::endl;
             pMap->addKmer(oKmer1);
