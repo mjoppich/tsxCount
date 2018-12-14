@@ -28,6 +28,8 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount)
 
 void testHashMap(TSXHashMap* pMap, bool parallel=false)
 {
+
+/*
     UBigInt m_iKeyMask(128, true, pMap->getMemoryPool());
     uint64_t iBla = 0x8000000800000ULL;
     m_iKeyMask = UBigInt::createFromBitShift(128, 64, pMap->getMemoryPool());
@@ -61,7 +63,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     std::cout << "BSHF20 " << m_iKeyMask.to_string() << std::endl;
 
 
-
+*/
 
     UBigInt oTest ("110110010001", pMap->getMemoryPool());
     std::cout << (oTest >> 7).to_string() << std::endl;
@@ -90,6 +92,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     pMap->setThreads(threads);
 
     std::cout << "Running on " << (int) threads << " threads" << std::endl;
+omp_set_dynamic(0);
 
     if (!parallel)
     {
@@ -102,19 +105,24 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
 
     size_t i;
+	omp_set_num_threads(8);
 
-#pragma omp parallel num_threads(threads)
+	std::cout << "Threads specified: " << (int) threads << "/" << pMap->getThreads()<<"/"<< omp_get_max_threads() << " OMP GET NUM THREADS " << omp_get_num_threads() << std::endl;
+
+#pragma omp parallel
     {
         int iThreadCount = omp_get_num_threads();
-
-#pragma omp master
+#pragma omp critical
         {
-            std::cerr << "Parellel=" << parallel << " Running on " << iThreadCount << " threads on map configured for " << pMap->getThreads() << std::endl;
+            std::cerr << "Parellel=" << parallel << " Running on thread " << omp_get_thread_num() << " on map configured for " << threads << " (omp threads) " << iThreadCount << std::endl;
+		
         }
+sleep(3);
+}
 
-#pragma omp barrier
 
-        #pragma omp for private(i)
+
+        #pragma omp parallel for private(i) num_threads(threads)
         for (i = 0; i < iMaxCount; ++i) {
 
 
@@ -147,7 +155,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
             }
         }
 
-    }
+
 
 
     evaluate(pMap, oKmer1, iMaxCount);
