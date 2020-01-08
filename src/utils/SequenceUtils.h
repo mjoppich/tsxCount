@@ -150,6 +150,11 @@ namespace TSXSeqUtils {
     }
 
 
+    static TSX::tsx_kmer_t fromSequenceD(std::string seq, MemoryPool<FIELDTYPE>* pPool)
+    {
+        return TSXSeqUtils::fromSequence(seq, pPool);
+    }
+
 }
 
 

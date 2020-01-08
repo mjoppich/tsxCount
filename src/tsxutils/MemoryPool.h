@@ -112,12 +112,19 @@ public:
 
 
         size_t iCnt=0;
+        size_t iFreeCount = 0;
+
         for (auto elem : this->m_vHeap)
         {
             iCnt += elem.ilength;
+
+            if (elem.free)
+            {
+                iFreeCount += elem.ilength;
+            }
         }
 
-        std::cerr << omp_get_thread_num() << " " << std::this_thread::get_id() << " Total element count " << iCnt << std::endl;
+        std::cerr << omp_get_thread_num() << " " << std::this_thread::get_id() << " Total element count " << iCnt << " with free spots: " << iFreeCount << std::endl;
 
         throw new MemoryPoolException<T>(NULL, "Unable to allocate memory.");
 
@@ -275,13 +282,13 @@ public:
 
     }
 
-    MemLoc malloc(size_t iElemCount)
+    virtual MemLoc malloc(size_t iElemCount)
     {
         size_t iThreadNum = omp_get_thread_num();
         return m_ppPatches[iThreadNum]->malloc(iElemCount);
     }
 
-    void free(MemLoc& pElem)
+    virtual void free(MemLoc& pElem)
     {
         size_t iThreadNum = omp_get_thread_num();
         m_ppPatches[iThreadNum]->free(pElem);
@@ -292,7 +299,43 @@ protected:
     size_t m_iThreads;
     MemoryPatch<T>** m_ppPatches;
 
-    const size_t m_iDefaultSize = 2000;
+    const size_t m_iDefaultSize = 200000;
+
+};
+
+
+template <class T>
+class DirectMemoryPool : public MemoryPool<T>{
+
+public:
+    DirectMemoryPool()
+    : MemoryPool<T>(0)
+    {
+
+    }
+
+    ~DirectMemoryPool()
+    {
+    }
+
+    MemLoc malloc(size_t iElemCount)
+    {
+
+        MemLoc oRet;
+        oRet.ilength = iElemCount;
+        oRet.free = false;
+        oRet.addr = ::malloc(sizeof(T) * iElemCount);
+
+        return oRet;
+    }
+
+    void free(MemLoc& pElem)
+    {
+        ::free(pElem.addr);
+    }
+
+protected:
+
 
 };
 

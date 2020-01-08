@@ -7,12 +7,10 @@
 #include <utils/CLParser.h>
 #include <fastxutils/FastXReader.h>
 #include <utils/SequenceUtils.h>
-#include <tsxcount/TSXHashMapTSX.h>
+#include <tsxcount/TSXHashMapTSXSmall.h>
 #include "testExecution.h"
 #include <stddef.h>
 #include <immintrin.h>
-
-
 
 
 int main(int argc, char *argv[])
@@ -24,7 +22,8 @@ int main(int argc, char *argv[])
 
     TSXHashMapTSX* ptMap = new TSXHashMapTSX(26, 4, itK, iThreads);
 
-    testHashMap(ptMap, true);
+    //testHashMapOld(ptMap, true);
+    testHashMap(ptMap, iThreads != 1);
 
 
     std::cerr << "Used fields: " << ptMap->getUsedPositions() << std::endl;

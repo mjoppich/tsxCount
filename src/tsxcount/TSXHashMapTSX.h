@@ -49,7 +49,7 @@ public:
     size_t iAddKmerCount = 0;
     size_t iAborts = 0;
 
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer)
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false)
     {
         bool bInserted = false;
 
@@ -188,7 +188,16 @@ public:
                     TSX::tsx_keyval_t* pSavedKey = &savedkey;
 
                     int iAbort = 0;
-                    uint status = _xbegin();
+
+
+                    uint status=0;
+                    if (!verbose)
+                    {
+                        status =  _xbegin();
+                    } else {
+                        status = _XBEGIN_STARTED ;
+                    }
+
 
                     if(status == _XBEGIN_STARTED) {
 
@@ -224,7 +233,10 @@ public:
                             pINC->keyval.copy_content_to_array(pPos, oStartPos.rem, m_iKeyValBits);
                         }
 
-                        _xend();
+                        if (!verbose)
+                        {
+                            _xend();
+                        }
 
                         this->iAddCount += 1;
                         bInserted = true;

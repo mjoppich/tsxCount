@@ -202,3 +202,21 @@ target_compile_options(tsxCountTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${Open
 
 TARGET_LINK_LIBRARIES(tsxCountTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountTSX DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+# Main app
+file(GLOB tsxCountTSXSMALL_H
+        "src/mains/testExecution.h"
+        )
+
+file(GLOB tsxCountTSXSMALL_SRC
+        "src/mains/main_tsxsmall.cpp"
+        )
+ADD_EXECUTABLE(tsxCountTSXSMALL ${tsxCountTSXSMALL_SRC} ${tsxCountTSXSMALL_H})
+target_include_directories(tsxCountTSXSMALL PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_compile_options(tsxCountTSXSMALL PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${OpenMP_CXX_FLAGS})
+
+TARGET_LINK_LIBRARIES(tsxCountTSXSMALL PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
+install(TARGETS tsxCountTSXSMALL DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+MESSAGE("")

@@ -641,11 +641,16 @@ public:
 
     }
 
-    uint64_t toUInt()
+    uint64_t toUInt(bool verbose=false)
     {
         if (m_iBits > 64)
         {
             throw ("Cannot represent BigInt in 64bits!");
+        }
+
+        if (verbose)
+        {
+            this->print_string();
         }
 
         if (m_iBits <= m_iFieldSize)

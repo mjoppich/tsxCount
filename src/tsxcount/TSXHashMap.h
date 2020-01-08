@@ -95,7 +95,9 @@ public:
         std::cerr << "Creating array with " << std::to_string(iBytes) << " bytes for " << std::to_string(iElements) << " places." << std::endl;
         m_pCounterArray = (FIELDTYPE*) calloc( sizeof(FIELDTYPE), iBytes);
 
-        m_iKmerStarts = UBigInt(0, m_pPool);
+        MemoryPool<FIELDTYPE>* pDirectPool = new DirectMemoryPool<FIELDTYPE>();
+
+        m_iKmerStarts = UBigInt(0, pDirectPool);
         m_iKmerStarts.resize(iElements);
 
 
@@ -156,7 +158,7 @@ public:
         return m_setUsedPositions.size();
     }
 
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer)
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false)
     {
         bool bInserted = false;
 
@@ -325,7 +327,80 @@ public:
 
     }
 
-    UBigInt getKmerCount(TSX::tsx_kmer_t& kmer)
+    void print_stats()
+    {
+        std::cerr << "Used fields: " << m_setUsedPositions.size() << std::endl;
+        std::cerr << "Available fields: " << std::pow(2.0, m_iL) << std::endl;
+        std::cerr << "k=" << m_iK << " l=" << (uint32_t) m_iL << " entry (key+value) bits=" << m_iKeyValBits << " storage bits=" << m_iStorageBits << std::endl;
+    }
+
+    std::vector<uint64_t> getKmerPositions(TSX::tsx_kmer_t& kmer)
+    {
+        // TODO this is a copy of getKmerCount and should be removed
+        bool bFound = false;
+
+        uint32_t iReprobes = 1;
+        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
+
+        UBigInt oResult(64, true, this->m_pPool);
+
+        std::vector<uint64_t> vPositions;
+
+        while ((!bFound) && ( iReprobes < m_iMaxReprobes))
+        {
+
+            // get possible position
+            uint64_t iPos = this->getPosition( basekey, iReprobes);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (!bEmpty)
+            {
+                TSX::tsx_keyval_t elem = this->getElement(iPos);
+                bool bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
+
+                if (bMatchesKey)
+                {
+                    bFound = true;
+
+
+                    oResult = this->getValFromKeyVal(elem);
+
+                    // TODO find possible remaining entries!
+                    UBigInt oOverflows = findOverflowCounts(iPos, basekey, iReprobes);
+
+                    vPositions.push_back(iPos);
+
+
+                    uint32_t iUsedOverflowBits = oOverflows.getBitCount();
+                    if (iUsedOverflowBits > 0)
+                    {
+                        oOverflows.resize( iUsedOverflowBits + m_iStorageBits );
+
+                        oOverflows = oOverflows << m_iStorageBits;
+                        oOverflows = oOverflows | oResult;
+
+                        oResult = oOverflows;
+                    }
+
+                }
+
+            } else {
+                // why would the insertion skip an empty place?
+                break;
+            }
+            ++iReprobes;
+        }
+
+        if (!bFound)
+        {
+            std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+        }
+        return vPositions;
+    }
+
+    UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false)
     {
         bool bFound = false;
 
@@ -361,9 +436,13 @@ public:
                     // TODO find possible remaining entries!
                     UBigInt oOverflows = findOverflowCounts(iPos, basekey, iReprobes);
 
-                    //std::cout << "Looking at pos " << iPos << std::endl;
-                    //std::cout << oResult.to_string() << std::endl;
-                    //std::cout << oOverflows.to_string() << std::endl;
+                    if (verbose)
+                    {
+                        std::cout << "Looking at pos " << iPos << std::endl;
+                        std::cout << oResult.to_string() << std::endl;
+                        std::cout << oOverflows.to_string() << std::endl;
+                    }
+
 
                     uint32_t iUsedOverflowBits = oOverflows.getBitCount();
                     if (iUsedOverflowBits > 0)
@@ -376,24 +455,26 @@ public:
                         oResult = oOverflows;
                     }
 
+                    if (verbose)
+                    {
+                        std::cout << "After Overflows " << std::endl;
+                        std::cout << oResult.to_string() << std::endl;
+                        std::cout << oOverflows.to_string() << std::endl;
+                    }
+
                 }
 
             } else {
-
                 // why would the insertion skip an empty place?
                 break;
             }
-
             ++iReprobes;
-
-
         }
 
         if (!bFound)
         {
             std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
         }
-
         return oResult;
     }
 
@@ -571,7 +652,7 @@ protected:
                 //std::cout << "OVFL B Match Key " << iPos << " " << iReprobe << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iReprobe);
+                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes); // was iReprobe
 
                 if (!bMatchesKey)
                     continue;
@@ -1086,7 +1167,7 @@ protected:
                 //std::cerr << "New field: POS " << std::to_string(iPos) << " for basekey " << basekey.to_string() << " with reprobes " << std::to_string(iPerformedReprobes) << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobe+iPerformedReprobes, true);
+                CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true); // was iReprobe+iPerformedReprobes
 
                 // no overflow can happen!
                 //this->performIncrement(&incRet);
@@ -1115,7 +1196,7 @@ protected:
                 }
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iReprobe+iPerformedReprobes);
+                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes); // was iReprobe+iPerformedReprobes
 
                 if (!bMatchesKey)
                 {
@@ -1134,7 +1215,7 @@ protected:
                 }
                  */
 
-                CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobe+iPerformedReprobes, true);
+                CIncrementElement incRet = this->incrementElement(iPos, basekey, iPerformedReprobes, true); // was iReprobe+iPerformedReprobes
                 pOPS->insert(pOPS->end(), incRet);
 
                 if (incRet.iOverflow == 0)
