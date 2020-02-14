@@ -29,13 +29,13 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 SET (CMAKE_C_FLAGS                "-Wall -std=c99 ${OpenMP_C_FLAGS}")
-SET (CMAKE_C_FLAGS_DEBUG          "-g")
+SET (CMAKE_C_FLAGS_DEBUG          "-g -O0")
 SET (CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
 SET (CMAKE_C_FLAGS_RELEASE        "-O4 -DNDEBUG")
 SET (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
 
 SET (CMAKE_CXX_FLAGS                "-Wall ${OpenMP_CXX_FLAGS}")
-SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
+SET (CMAKE_CXX_FLAGS_DEBUG          "-g -O0")
 SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
@@ -218,5 +218,23 @@ target_compile_options(tsxCountTSXSMALL PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm $
 
 TARGET_LINK_LIBRARIES(tsxCountTSXSMALL PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountTSXSMALL DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+
+# Main tsx perf
+file(GLOB tsxCountTSXPERF_H
+        "src/mains/testExecution.h"
+        )
+
+file(GLOB tsxCountTSXPERF_SRC
+        "src/mains/main_tsxperf.cpp"
+        )
+ADD_EXECUTABLE(tsxCountTSXPERF ${tsxCountTSXPERF_SRC} ${tsxCountTSXPERF_H})
+target_include_directories(tsxCountTSXPERF PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_compile_options(tsxCountTSXPERF PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${OpenMP_CXX_FLAGS})
+
+TARGET_LINK_LIBRARIES(tsxCountTSXPERF PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
+install(TARGETS tsxCountTSXPERF DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
 
 MESSAGE("")

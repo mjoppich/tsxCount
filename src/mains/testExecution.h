@@ -83,6 +83,7 @@ std::vector<std::string> split(const std::string& str, char delim = '\t')
 std::map<std::string, uint32_t> loadReferences(std::string sFilename)
 {
 
+    std::cerr << "Loading reference file: " << sFilename << std::endl;
     std::ifstream file(sFilename);
 
     std::map<std::string, uint32_t> kmer2count;
@@ -127,8 +128,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
 
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
-    sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
-    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
 
@@ -165,12 +166,20 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                         std::string sSeq = pEntry->getSequence();
                         std::vector<std::string> allKmers = createKMers(sSeq, iK, pPool);
 
+                        uint32_t iAddedKmers = 0;
+                        uint32_t iTotalKmers = allKmers.size();
+
                         for (auto kmerStr : allKmers)
                         {
 
                             TSX::tsx_kmer_t oKmer = TSXSeqUtils::fromSequence(kmerStr, pPool);
                             bool vadd = false;
                             std::vector<uint64_t> vAllPos;
+
+                            //if (iAddedKmers % 10 == 0)
+                            //{
+                            //   std::cout << "processed " << iAddedKmers << " of " << iTotalKmers << std::endl;
+                            //}
 
 
                             if (verbose)
@@ -213,7 +222,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
                             }
 
-                            pMap->addKmer(oKmer, vadd);
+                            pMap->addKmer(oKmer, true); //vadd
+                            //iAddedKmers += 1;
 
 
                             if (verbose)
@@ -279,12 +289,12 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
     std::cout << "Added a total of " << pMap->getKmerCount() << " different kmers" << std::endl;
 
-    std::map<std::string, uint32_t> kmer2c = loadReferences(sFileName + std::to_string(iK) + ".count");
+    std::map<std::string, uint32_t> kmer2c = loadReferences(sFileName + "." + std::to_string(iK) + ".count");
 
 
     // checking counts
-
     std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
+    std::cout << "Manual counts: " << kmer2c.size() << std::endl;
 
     for (auto& elem: kmer2c) {
 

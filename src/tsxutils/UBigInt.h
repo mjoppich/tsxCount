@@ -532,7 +532,7 @@ public:
             }
         }
 
-        size_t iShift = m_iFieldSize - procs.rem;
+        uint32_t iShift = m_iFieldSize - procs.rem;
 
         FIELDTYPE thisRemain = this->m_pArray[checkIdx] << iShift;
 
@@ -834,20 +834,57 @@ public:
 
     }
 
-    void shiftLeft( uint32_t iShift)
+    static void shift_array_left(FIELDTYPE* pArray, uint16_t iFieldSize, uint16_t iFields, uint16_t iShift)
+    {
+
+        if (iShift >= iFieldSize)
+        {
+
+            uint16_t iFields = iShift / iFieldSize;
+
+            uint32_t i;
+            for (i = 0; i < iFields-iFields; ++i)
+            {
+                pArray[iFields-1 -i] = pArray[iFields-1-i-iFields];
+            }
+
+            for (i; i < iFields; ++i)
+            {
+                pArray[iFields-1 -i] = 0;
+            }
+        }
+
+        iShift = iShift % iFieldSize;
+        uint32_t iCounterShift = iFieldSize - iShift;
+
+        FIELDTYPE iCurField, iNextFieldPart;
+
+        for (uint32_t i = 0; i < iFields-1; ++i)
+        {
+            iCurField = (pArray[iFields-1-i] << iShift);
+            iNextFieldPart = (pArray[iFields-1-i-1] >> iCounterShift);
+            iCurField = iCurField | iNextFieldPart;
+
+            pArray[iFields-1 -i] = iCurField;
+        }
+
+        pArray[0] = (pArray[0] << iShift);
+
+    }
+
+
+    void shiftLeft( uint16_t iShift)
     {
 
         if (iShift >= m_iFieldSize)
         {
 
-            uint64_t iFields = iShift / m_iFieldSize;
+            uint16_t iFields = iShift / m_iFieldSize;
 
             uint32_t i;
             for (i = 0; i < m_iFields-iFields; ++i)
             {
-
                 m_pArray[m_iFields-1 -i] = m_pArray[m_iFields-1-i-iFields];
-
             }
 
             for (i; i < m_iFields; ++i)
@@ -859,17 +896,18 @@ public:
         iShift = iShift % m_iFieldSize;
         uint32_t iCounterShift = m_iFieldSize - iShift;
 
+        FIELDTYPE iCurField, iNextFieldPart;
+
         for (uint32_t i = 0; i < m_iFields-1; ++i)
         {
-            FIELDTYPE iCurField = (m_pArray[m_iFields-1-i] << iShift);
-            FIELDTYPE iNextFieldPart = (m_pArray[m_iFields-1-i-1] >> iCounterShift);
+            iCurField = (m_pArray[m_iFields-1-i] << iShift);
+            iNextFieldPart = (m_pArray[m_iFields-1-i-1] >> iCounterShift);
+            iCurField = iCurField | iNextFieldPart;
 
-            m_pArray[m_iFields-1 -i] = iCurField | iNextFieldPart;
-
+            m_pArray[m_iFields-1 -i] = iCurField;
         }
 
         m_pArray[0] = (m_pArray[0] << iShift);
-
 
     }
 
@@ -1143,6 +1181,13 @@ public:
         } );
 
     }
+
+    uint32_t m_iBits = 0;
+    uint32_t m_iFields = 0;
+
+    FIELDTYPE* m_pArray = NULL;
+    static const uint8_t m_iFieldSize = sizeof(FIELDTYPE) * 8;
+
 
 protected:
 
@@ -1567,11 +1612,6 @@ protected:
 
 
 
-    uint32_t m_iBits = 0;
-    uint32_t m_iFields = 0;
-
-    FIELDTYPE* m_pArray = NULL;
-    static const uint8_t m_iFieldSize = sizeof(FIELDTYPE) * 8;
 
     FIELDTYPE m_iUnusedBitsMask;
 

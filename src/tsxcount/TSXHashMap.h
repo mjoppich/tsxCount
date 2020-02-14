@@ -114,8 +114,12 @@ public:
         m_mask_reprobe_func = m_mask_reprobe_func-1;
         m_mask_func_reprobe = ~m_mask_reprobe_func;
 
+        m_mask_kv_reprobevalue = UBigInt(2*m_iK + m_iStorageBits, true, this->m_pPool);
+        m_mask_kv_reprobevalue.setBit(m_iL + m_iStorageBits, 1);
 
-        /*
+        m_mask_kv_reprobevalue = m_mask_kv_reprobevalue-1;
+        m_mask_kv_func = ~m_mask_kv_reprobevalue;
+
         std::cerr << "Value Mask (value = 1) m_mask_value_key" << std::endl;
         std::cerr << m_mask_value_key.to_string() << std::endl;
 
@@ -127,7 +131,15 @@ public:
 
         std::cerr << "Func Mask (func = 1) m_mask_func_reprobe" << std::endl;
         std::cerr << m_mask_func_reprobe.to_string() << std::endl;
-        */
+
+        std::cerr << "Func + Reprobe + value Mask (func = 1) m_mask_kv_func" << std::endl;
+        std::cerr << m_mask_kv_func.to_string() << std::endl;
+
+        std::cerr << "Func + Reprobe + value Mask (reprobe+value=1) m_mask_kv_reprobevalue" << std::endl;
+        std::cerr << m_mask_kv_reprobevalue.to_string() << std::endl;
+
+        std::cerr.flush();
+
 
         m_pHashingFunction = new BijectiveKMapping(m_iK, this->m_pPool);
 
@@ -160,6 +172,7 @@ public:
 
     virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false)
     {
+
         bool bInserted = false;
 
         uint32_t iReprobes = 1;
@@ -571,6 +584,17 @@ public:
         this->initialiseLocks();
     }
 
+    inline static std::div_t udiv(uint32_t a, uint32_t b)
+    {
+
+        std::div_t ret;
+
+        ret.quot = a / b;
+        ret.rem = a % b;
+
+        return ret;
+    }
+
 protected:
 
 
@@ -788,20 +812,10 @@ protected:
     bool positionEmpty(uint64_t iPos)
     {
         tsx_keyval_t element = this->getElement(iPos);
-
         return element.isZero();
     }
 
-    inline std::div_t udiv(uint32_t a, uint32_t b)
-    {
 
-        std::div_t ret;
-
-        ret.quot = a / b;
-        ret.rem = a % b;
-
-        return ret;
-    }
 
 
     /**
@@ -1294,6 +1308,9 @@ protected:
 
     TSX::tsx_key_t m_mask_reprobe_func = UBigInt(0, m_pPool);
     TSX::tsx_key_t m_mask_func_reprobe = UBigInt(0, m_pPool);
+
+    TSX::tsx_keyval_t m_mask_kv_func = UBigInt(0, m_pPool);
+    TSX::tsx_keyval_t m_mask_kv_reprobevalue = UBigInt(0, m_pPool);
 
 };
 
