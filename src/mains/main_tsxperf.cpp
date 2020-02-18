@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 
 
     uint32_t itK = 14;
-    uint32_t iThreads = 1;
+    uint32_t iThreads = 4;
 
     TSXHashMapTSXPerf* ptMap = new TSXHashMapTSXPerf(26, 4, itK, iThreads);
 

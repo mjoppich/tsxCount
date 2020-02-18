@@ -128,7 +128,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
 
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
-    //sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
+    sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
+    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
@@ -141,7 +142,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 #pragma omp master
         {
             bool exitNow = false;
-            bool verbose = false;
+            bool verbose = true;
 
             while (pReader->hasNext())
             {
@@ -169,6 +170,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                         uint32_t iAddedKmers = 0;
                         uint32_t iTotalKmers = allKmers.size();
 
+                        std::string targetKmer = "AACAGCGTTTCGTC";
+
                         for (auto kmerStr : allKmers)
                         {
 
@@ -186,7 +189,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                             {
 
 
-                                if (kmerStr == "TATTATTATTATTG")
+                                if (kmerStr == targetKmer)
                                 {
                                     UBigInt oRes1 = pMap->getKmerCount(oKmer);
 
@@ -208,7 +211,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                                         {
                                             std::cerr << "POI usage BEFORE " << kmerStr << " " << iPos << " " << iPosOfInterest << std::endl;
 
-                                            std::string stest = "TATTATTATTATTG";
+                                            std::string stest = targetKmer;
 
                                             TSX::tsx_kmer_t oTestKmer = TSXSeqUtils::fromSequence(stest, pPool);
                                             UBigInt oRes1 = pMap->getKmerCount(oTestKmer);
@@ -237,7 +240,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                                         {
                                             std::cerr << "POI usage AFTER " << kmerStr << " " << iPos << " " << iPosOfInterest << std::endl;
 
-                                            std::string stest = "TATTATTATTATTG";
+                                            std::string stest = targetKmer;
 
                                             TSX::tsx_kmer_t oTestKmer = TSXSeqUtils::fromSequence(stest, pPool);
                                             UBigInt oRes1 = pMap->getKmerCount(oTestKmer);
@@ -247,7 +250,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                                     }
                                 }
 
-                                if (kmerStr == "TATTATTATTATTG")
+                                if (kmerStr == targetKmer)
                                 {
                                     std::vector<uint64_t> vPos = pMap->getKmerPositions(oKmer);
                                     for (auto iPos : vPos)
@@ -296,12 +299,24 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
     std::cout << "Manual counts: " << kmer2c.size() << std::endl;
 
-    for (auto& elem: kmer2c) {
 
-        UBigInt tkmer = TSXSeqUtils::fromSequenceD(elem.first, pMap->getMemoryPool());
-        evaluate(pMap, tkmer, elem.second, &(elem.first));
 
+#pragma omp parallel
+    {
+#pragma omp single
+        {
+            for (auto& elem: kmer2c)
+            {
+#pragma omp task
+                {
+                    // Do something with x, e.g.
+                    UBigInt tkmer = TSXSeqUtils::fromSequenceD(elem.first, pMap->getMemoryPool());
+                    evaluate(pMap, tkmer, elem.second, &(elem.first));
+                }
+            }
+        }
     }
+
 
     std::cout << "Kmer count check completed." << std::endl;
 

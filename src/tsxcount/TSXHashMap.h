@@ -408,7 +408,7 @@ public:
 
         if (!bFound)
         {
-            std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+            //std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
         }
         return vPositions;
     }

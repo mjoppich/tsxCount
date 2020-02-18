@@ -124,7 +124,7 @@ public:
                     // TODO this slows down inserting, but is a nice measure ifdef out verbose?
                     m_setUsedPositions.insert(iPos);
 
-                    std::cout << iPos << " " << pINC->keyval.to_string() << std::endl;
+                    //std::cout << iPos << " " << pINC->keyval.to_string() << std::endl;
 
 
                     this->iAddCount += 1;

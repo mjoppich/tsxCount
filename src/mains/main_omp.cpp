@@ -13,8 +13,8 @@
 int main(int argc, char *argv[])
 {
 
-    uint32_t itK = 15;
-    TSXHashMapOMP* pTMap = new TSXHashMapOMP(28, 4, itK);
+    uint32_t itK = 14;
+    TSXHashMapOMP* pTMap = new TSXHashMapOMP(26, 4, itK);
     testHashMap(pTMap, true);
 
     return 0;
