@@ -413,7 +413,7 @@ public:
         return vPositions;
     }
 
-    UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false)
+    virtual UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false)
     {
         bool bFound = false;
 
@@ -646,7 +646,7 @@ protected:
         return true;
     }
 
-    UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
+    virtual UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe)
     {
         bool bHandled = false;
         uint32_t iPerformedReprobes = 0;

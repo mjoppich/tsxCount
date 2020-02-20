@@ -49,15 +49,20 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std
 
     if (iRefCount != iKmer1Count)
     {
-        std::cerr << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount;
-
-        UBigInt oRes2 = pMap->getKmerCount(kmer, true);
-        if (pKmer != NULL)
+#pragma omp critical
         {
-            std::cerr << " " << *pKmer;
-        }
+            std::cerr << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;
 
-        std::cerr <<  std::endl;
+
+            UBigInt oRes2 = pMap->getKmerCount(kmer, true);
+            if (pKmer != NULL)
+            {
+                std::cerr << " " << *pKmer;
+            }
+
+            std::cerr <<  std::endl;
+        };
+
     }
 
 
@@ -130,6 +135,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
+    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.5000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
@@ -142,7 +148,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 #pragma omp master
         {
             bool exitNow = false;
-            bool verbose = true;
+            bool verbose = false;
 
             while (pReader->hasNext())
             {
@@ -170,7 +176,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                         uint32_t iAddedKmers = 0;
                         uint32_t iTotalKmers = allKmers.size();
 
-                        std::string targetKmer = "AACAGCGTTTCGTC";
+                        std::string targetKmer = "TTCCATTCCATTCC";
 
                         for (auto kmerStr : allKmers)
                         {
@@ -225,7 +231,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
                             }
 
-                            pMap->addKmer(oKmer, true); //vadd
+                            pMap->addKmer(oKmer, verbose); //vadd
                             //iAddedKmers += 1;
 
 
