@@ -480,8 +480,9 @@ public:
              */
 
             uint64_t iPos = this->getPosition(basekey, iReprobes);
-
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
+
+
             key_reprobe_shift.resize(m_iKeyValBits);
             key_reprobe_shift = (key_reprobe_shift << m_iStorageBits);
 
@@ -587,7 +588,7 @@ public:
 
                         while (iAddStatus == 0)
                         {
-                            iAddStatus= this->incrementElement_tsx(kmer, iPos, basekey, iReprobes, false, verbose);
+                            iAddStatus= this->incrementElement_tsx(kmer, iPos, basekey, iReprobes, iReprobes, false, verbose);
                         }
 
                         if (isCurTest)
@@ -604,7 +605,7 @@ public:
 
                             while (iOverflowStatus == 0)
                             {
-                                iOverflowStatus = this->handleOverflow_tsx(kmer, iPos, basekey, iReprobes, verbose);
+                                iOverflowStatus = this->handleOverflow_tsx(kmer, iPos, basekey, iReprobes, iReprobes, verbose);
                             }
 
                             if (isCurTest)
@@ -985,7 +986,7 @@ public:
      *
      * @details this function already handles overflows
      */
-    uint8_t incrementElement_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, bool bKeyIsValue, bool verbose=false)
+    uint8_t incrementElement_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, uint32_t iInitialReprobes, bool bKeyIsValue, bool verbose=false)
     {
 
         std::string sTestStr = "TTCCATTCCATTCC";
@@ -1080,7 +1081,7 @@ public:
                 {
                     // value incremented, but overflow occurred => this was already func => return overflow
 
-                    uint8_t iOverflowReturn = this->handleOverflow_tsx(kmer, iPosition, key, reprobes, verbose);
+                    uint8_t iOverflowReturn = this->handleOverflow_tsx(kmer, iPosition, key, reprobes, iInitialReprobes, verbose);
 
                     if (iOverflowReturn == 0)
                     {
@@ -1193,6 +1194,9 @@ public:
 
         UBigInt oReturn(0, m_pPool);
         uint32_t iRequiredBits = 0;
+        uint64_t origPos = iPos;
+
+        uint32_t iInitialReprobes = iReprobe;
 
         while (iPerformedReprobes < 10)
         {
@@ -1215,7 +1219,7 @@ public:
                 //std::cout << "OVFL B Match Key " << iPos << " " << iReprobe << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes); // was iReprobe
+                bool bMatchesKey = positionMatchesOverflowReprobe(iPos, basekey, iReprobe, iPerformedReprobes); // was iReprobe
 
                 if (!bMatchesKey)
                 {
@@ -1224,7 +1228,7 @@ public:
                     {
                         TSX::tsx_keyval_t elem = this->getElement(iPos);
 
-                        std::cout << "OVFL Unmatched Key " << iPos << " " << iReprobe << " " << iPerformedReprobes << " " << iPerformedReprobes+iReprobe << std::endl;
+                        std::cout << "OVFL Unmatched Key; orig pos " << origPos << " test pos " << iPos << " initial reprobes " << iInitialReprobes << " reprobe " << iReprobe << " perf reprobe " << iPerformedReprobes << " all_reprobes " << iPerformedReprobes+iReprobe << std::endl;
                         std::cout << elem.to_string() << std::endl;
                     }
 
@@ -1235,7 +1239,7 @@ public:
 
                 if (verbose)
                 {
-                    std::cout << "OVFL A Match Key " << iPos << " " << iReprobe << " " << iPerformedReprobes << " " << iPerformedReprobes+iReprobe << std::endl;
+                    std::cout << "OVFL A Match Key " << iPos << " init_reprobe " << iInitialReprobes << " reprobes " << iReprobe << " p_reprobes " << iPerformedReprobes << " " << iPerformedReprobes+iReprobe << std::endl;
                 }
 
                 TSX::tsx_keyval_t elem = this->getElement(iPos);
@@ -1265,7 +1269,46 @@ public:
 
     }
 
-    virtual uint8_t handleOverflow_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe, bool verbose=false)
+    TSX::tsx_key_t makeOverflowReprobe(uint32_t iReprobe, uint32_t iPerfReprobe)
+    {
+
+        uint32_t iReprobeLength = m_iL;
+        uint32_t iPerfReprobeBits = (uint32_t) std::floor(iReprobeLength/2.0);
+
+        TSX::tsx_key_t oRet = UBigInt(iReprobeLength, true, m_pPool);
+        oRet.resize(iReprobeLength);
+        TSX::tsx_key_t oReprobe = UBigInt(iReprobe, m_pPool);
+        oReprobe.resize(iReprobeLength);
+        TSX::tsx_key_t oPerfReprobe = UBigInt(iPerfReprobe, m_pPool);
+        oPerfReprobe.resize(iReprobeLength);
+
+        oRet = oRet | oReprobe;
+        oRet = oRet << iReprobeLength-iPerfReprobeBits;
+        oRet = oRet | oPerfReprobe;
+
+        return oRet;
+
+    }
+
+    bool positionMatchesOverflowReprobe(uint64_t pos, TSX::tsx_key_t& key, uint32_t iReprobe, uint32_t iPerfReprobe)
+    {
+
+        // get key from position
+        TSX::tsx_keyval_t oKeyVal = getElement(pos);
+        TSX::tsx_key_t oKey = this->getKeyFromKeyVal(oKeyVal);
+
+        TSX::tsx_key_t oReprobe = this->makeOverflowReprobe(iReprobe, iPerfReprobe);//iReprobe, this->m_pPool);
+        oReprobe.resize(2*m_iK);
+
+        // extract position reprobe and compare with reprobe value
+        bool reprobeMatch = (oKey & m_mask_reprobe_func) == oReprobe;
+
+        return reprobeMatch;
+
+    }
+
+
+    virtual uint8_t handleOverflow_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe, uint32_t iInitialReprobes, bool verbose=false)
     {
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
@@ -1275,7 +1318,7 @@ public:
         std::string sTestStr = "AACAGCGTTTCGTC";
         UBigInt sTest = fromSequence(sTestStr, m_pPool);
         bool isCurTest = sTest == kmer;
-        isCurTest = false;
+        isCurTest = true;
 
         sTestStr = toSequence(kmer);
 
@@ -1298,6 +1341,8 @@ public:
             // this fetches the element using the global reprobe!
             uint64_t iPos = this->getPosition(basekey, iReprobe + iPerformedReprobes);
 
+            TSX::tsx_key_t reprobePart = this->makeOverflowReprobe(iReprobe, iPerformedReprobes);
+
             if (isCurTest)
             {
                 std::cout << "adding overflow kmer  " << sTestStr << " in " << iPos << " with reprobe " << iReprobe << " perf reprobe " << iPerformedReprobes << std::endl;
@@ -1308,7 +1353,7 @@ public:
 
             TSX::tsx_key_t key = (basekey & m_mask_func_reprobe);
             TSX::tsx_key_t updkey = TSX::tsx_key_t(2*m_iK, true, this->m_pPool);
-            updkey = updkey | UBigInt(iPerformedReprobes, this->m_pPool);
+            updkey = updkey | reprobePart; //UBigInt(iPerformedReprobes+iReprobe-iInitialReprobes, this->m_pPool);
 
             TSX::tsx_keyval_t oKeyVal(updkey, 2 * m_iK + m_iStorageBits);
             oKeyVal = (oKeyVal << m_iStorageBits);
@@ -1358,6 +1403,7 @@ public:
                 {
                     std::cout << "overflow add empty after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " " << iPos << std::endl;
                     std::cout << "overflow add empty " << sTestStr  << " " << iPos << " " << oKeyVal.to_string() << std::endl;
+                    std::cout << "overflow add empty initial reprobes " << iInitialReprobes << " reprobes " << iReprobe << " perf reprobes " << iPerformedReprobes << std::endl;
                 }
 
                 //std::cout << "overflow add empty  after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " " << iPos << std::endl;
@@ -1384,7 +1430,7 @@ public:
                      */
 
                     // the reprobe part must match the number of reprobes back to the previous entry!
-                    bool bMatchesKey = positionMatchesReprobe(iPos, basekey, iPerformedReprobes); // was iReprobe+iPerformedReprobes
+                    bool bMatchesKey = positionMatchesOverflowReprobe(iPos, basekey, iReprobe, iPerformedReprobes); // was iReprobe+iPerformedReprobes
 
                     if ((bIsKmerStart) || (!bMatchesKey)) {
                         //std::cout << "overflow Skipping position " << iPos << ": kmer=" << bIsKmerStart << " reprobes=" << iReprobe << " match=" << bMatchesKey << std::endl;
@@ -1394,7 +1440,7 @@ public:
 
                     //std::cout << "overflow add before inc " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " in pos " << iPos << std::endl;
 
-                    uint8_t incremented = this->incrementElement_tsx(kmer, iPos, basekey, iReprobe+iPerformedReprobes, true, verbose); // was iReprobe+iPerformedReprobes
+                    uint8_t incremented = this->incrementElement_tsx(kmer, iPos, basekey, iReprobe+iPerformedReprobes, iInitialReprobes, true, verbose); // was iReprobe+iPerformedReprobes
 
                     if (incremented == 0) {
 
@@ -1404,7 +1450,7 @@ public:
                         // redo increment ...
                         continue;
                     } else if (incremented == 2){
-                        this->handleOverflow_tsx(kmer, iPos, basekey, iReprobe + iPerformedReprobes, verbose);
+                        this->handleOverflow_tsx(kmer, iPos, basekey, iReprobe + iPerformedReprobes, iInitialReprobes, verbose);
                     }
                     //std::cout << "overflow add after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " in pos " << iPos << std::endl;
 

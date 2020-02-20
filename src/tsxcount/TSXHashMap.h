@@ -491,6 +491,11 @@ public:
         return oResult;
     }
 
+    IBijectiveFunction* getHashingFunc()
+    {
+        return m_pHashingFunction;
+    }
+
     uint64_t getKmerCount()
     {
         return this->m_iKmerStarts.sumBits();
@@ -594,6 +599,28 @@ public:
 
         return ret;
     }
+
+    inline uint64_t getPosition(TSX::tsx_key_t& basekey, uint32_t iReprobes)
+    {
+
+
+        UBigInt hashedKey(basekey);
+
+        // Uk is still in range [0, 4^k -1]
+        hashedKey = hashedKey + this->reprobe(iReprobes); // was this->reprobe(iReprobes)
+
+        //std::cerr << "kmer key: " << hashedKey.to_string() << std::endl;
+
+        UBigInt mod2 = hashedKey.mod2( m_iL );
+
+        //std::cerr << "kmer key % 2: " << mod2.to_string() << std::endl;
+
+        // Uk.mod2 now is in range [0, M-1] = [0, 2^l -1]
+        uint64_t iPos = mod2.toUInt();
+
+        return iPos;
+    }
+
 
 protected:
 
@@ -740,26 +767,7 @@ protected:
 
     }
 
-    inline uint64_t getPosition(TSX::tsx_key_t& basekey, uint32_t iReprobes)
-    {
 
-
-        UBigInt hashedKey(basekey);
-        
-        // Uk is still in range [0, 4^k -1]
-        hashedKey = hashedKey + this->reprobe(iReprobes);
-
-        //std::cerr << "kmer key: " << hashedKey.to_string() << std::endl;
-
-        UBigInt mod2 = hashedKey.mod2( m_iL );
-
-        //std::cerr << "kmer key % 2: " << mod2.to_string() << std::endl;
-
-        // Uk.mod2 now is in range [0, M-1] = [0, 2^l -1]
-        uint64_t iPos = mod2.toUInt();
-
-        return iPos;
-    }
 
     bool positionMatchesKeyAndReprobe(uint64_t pos, TSX::tsx_key_t& key, uint32_t iReprobe)
     {
