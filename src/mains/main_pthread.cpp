@@ -14,8 +14,8 @@
 int main(int argc, char *argv[])
 {
 
-    uint32_t itK = 15;
-    TSXHashMapPThread* ptMap = new TSXHashMapPThread(28, 4, itK, 2);
+    uint32_t itK = 14;
+    TSXHashMapPThread* ptMap = new TSXHashMapPThread(26, 4, itK, 2);
     
     testHashMap(ptMap, true);
     

@@ -136,8 +136,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
     sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.5000.fastq";
-    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.8000.fastq";
-    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
+    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.8000.fastq";
+    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
 

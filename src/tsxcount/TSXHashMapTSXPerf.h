@@ -16,39 +16,7 @@
 #include <rtmintrin.h>
 #include <cmath>
 
-std::string toSequence(TSX::tsx_kmer_t& oSeq)
-{
 
-    std::string sRetSeq;
-    sRetSeq.resize(oSeq.getBitCount()/2);
-
-    UBigInt oTest(oSeq);
-
-    for (size_t i = 0; i < sRetSeq.size(); ++i)
-    {
-
-        UBigInt oVal = oTest;
-        oVal.resize(2);
-
-        oTest = oTest >> 2;
-
-        uint8_t iVal = oVal.toUInt();
-
-        switch (iVal)
-        {
-            case 0: sRetSeq[i] = 'A'; break;
-            case 1: sRetSeq[i] = 'C'; break;
-            case 2: sRetSeq[i] = 'G'; break;
-            case 3: sRetSeq[i] = 'T'; break;
-
-            default: sRetSeq[i] = 'N'; break;
-
-        }
-
-    }
-
-    return sRetSeq;
-}
 
 TSX::tsx_kmer_t fromSequence(std::string& seq, MemoryPool<FIELDTYPE>* pPool)
 {
@@ -435,13 +403,17 @@ public:
     {
 
         this->setThreads(iThreads);
-        this->initialiseLocks();
 
     }
+
 
     virtual ~TSXHashMapTSXPerf()
     {
         free(m_pLocked);
+
+
+        free(m_pTMP_KEYVAL);
+        free(m_pTMP_VALUE);
     }
     size_t iAddCount = 0;
     size_t iAddKmerCount = 0;
@@ -701,6 +673,9 @@ public:
         std::string stest = m_mask_value_key.to_string();
         stest = m_mask_key_value.to_string();
 
+        uint8_t iThreadID = omp_get_thread_num();
+
+
         //std::cout << "in inc key value" << std::endl;
 
         for (uint8_t iTSXRetries=0; iTSXRetries < 10; ++iTSXRetries) {
@@ -716,16 +691,8 @@ public:
 
             TSX::tsx_val_t value = UBigInt(m_iStorageBits, true, this->m_pPool);
 
-            SBIGINT* pZero = getEmptySBIGINT(m_iStorageBits);
-            SBIGINT* pKeyVal = getEmptySBIGINT(m_iKeyValBits);
-            SBIGINT* pTest = getEmptySBIGINT(m_iKeyValBits);
-            SBIGINT* pValue = getEmptySBIGINT(m_iKeyValBits);
-
-
-            getFromMemory(pTest, iStartOffset, m_iKeyValBits, pPos);
-
-            UBigInt saved_b = fromStructToClass(pTest, m_pPool);
-            //std::cout << "before inc position " << " " << iPosition << " " << saved_b.to_string() << std::endl;
+            SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
+            SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
 
 
             asm volatile("":: :"memory");
@@ -740,7 +707,6 @@ public:
 
                 //(*pSavedKey).copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
                 getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
-                getFromMemory(pTest, iStartOffset, m_iKeyValBits, pPos);
 
                 //value = (*pSavedKey) &  m_mask_value_key;
 
@@ -839,6 +805,7 @@ public:
          * ONLY INCREMENT FUNC PART => ret 2 on overflow
          *
          */
+        uint8_t iThreadID = omp_get_thread_num();
 
         for (uint8_t iTSXRetries=0; iTSXRetries < 10; ++iTSXRetries) {
 
@@ -855,9 +822,8 @@ public:
             PREFETCH = pPos[0];
             asm volatile("":: :"memory");
 
-            SBIGINT* pKeyVal = getEmptySBIGINT(m_iKeyValBits);
-            SBIGINT* pValue = getEmptySBIGINT(m_iKeyValBits);
-            SBIGINT* pOrigValue = getEmptySBIGINT(m_iKeyValBits);
+            SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
+            SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
 
             m_mask_kv_reprobevalue;
 
@@ -875,9 +841,6 @@ public:
                 for (uint8_t i = 0; i < pKeyVal->iFields; ++i)
                 {
                     pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_kv_func.m_pArray[i];
-                    pOrigValue->pdata[i] = pKeyVal->pdata[i];
-
-
                     pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_kv_reprobevalue.m_pArray[i];
 
                 }
@@ -999,10 +962,13 @@ public:
         //std::cout << "increment element tsx " << iPosition << std::endl;
 
         // try to increment value
+        uint8_t iIncrementTries = 0;
+        uint8_t iIncrementState = 0;
 
-        for (uint8_t iIncrementTries=0; iIncrementTries < 10; ++iIncrementTries)
+        //for (iIncrementTries=0; iIncrementTries < 100; ++iIncrementTries)
+        while(iIncrementState == 0)
         {
-            uint8_t iIncrementState = this->incrementElement_key_value(kmer, iPosition, key, reprobes, verbose);
+            iIncrementState = this->incrementElement_key_value(kmer, iPosition, key, reprobes, verbose);
 
             if (iIncrementState == 0)
             {
@@ -1050,7 +1016,8 @@ public:
 
 
 
-
+        uint8_t iFuncIncrementTries =0;
+        uint8_t iIncrementFuncState = -1;
         // the value part had an overflow => maybe the func part can handle this => only if key is value
         if (handleFuncOverflow && bKeyIsValue)
         {
@@ -1060,9 +1027,9 @@ public:
                 std::cout << "cur test overflow in increment" << " pos="<< iPosition<< std::endl;
             }
             // try to avoid overflow by incrementing func part
-            for (uint8_t iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
+            for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
 
-                uint8_t iIncrementFuncState = this->incrementElement_func(kmer, iPosition, key, reprobes, verbose);
+                iIncrementFuncState = this->incrementElement_func(kmer, iPosition, key, reprobes, verbose);
 
                 if (isCurTest)
                 {
@@ -1103,90 +1070,17 @@ public:
             }
         }
 
+
+        std::cout << handleFuncOverflow << " " << bKeyIsValue << " " << (int) iIncrementTries << " " << (int) iIncrementState << " " << (int)iFuncIncrementTries << " " << (int)iIncrementFuncState << std::endl;
+        this->print_stats();
+
         exit(33);
 
         // should never reach this => not inserted
         return 0;
     }
 
-    virtual UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false)
-    {
-        bool bFound = false;
-
-
-        uint32_t iReprobes = 1;
-        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
-
-        UBigInt oResult(64, true, this->m_pPool);
-
-        while ((!bFound) && ( iReprobes < m_iMaxReprobes))
-        {
-
-            // get possible position
-            uint64_t iPos = this->getPosition( basekey, iReprobes);
-
-            // does this position match to key?
-            bool bEmpty = positionEmpty(iPos);
-
-            if (!bEmpty)
-            {
-
-
-                TSX::tsx_keyval_t elem = this->getElement(iPos);
-                bool bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-
-                if (bMatchesKey)
-                {
-                    bFound = true;
-
-
-                    oResult = this->getValFromKeyVal(elem);
-
-                    // TODO find possible remaining entries!
-                    UBigInt oOverflows = findOverflowCounts(iPos, basekey, iReprobes, verbose);
-
-                    if (verbose)
-                    {
-                        std::cout << "Looking at pos " << iPos << std::endl;
-                        std::cout << oResult.to_string() << std::endl;
-                        std::cout << oOverflows.to_string() << std::endl;
-                    }
-
-
-                    uint32_t iUsedOverflowBits = oOverflows.getBitCount();
-                    if (iUsedOverflowBits > 0)
-                    {
-                        oOverflows.resize( iUsedOverflowBits + m_iStorageBits );
-
-                        oOverflows = oOverflows << m_iStorageBits;
-                        oOverflows = oOverflows | oResult;
-
-                        oResult = oOverflows;
-                    }
-
-                    if (verbose)
-                    {
-                        std::cout << "After Overflows " << std::endl;
-                        std::cout << oResult.to_string() << std::endl;
-                        std::cout << oOverflows.to_string() << std::endl;
-                    }
-
-                }
-
-            } else {
-                // why would the insertion skip an empty place?
-                break;
-            }
-            ++iReprobes;
-        }
-
-        if (!bFound)
-        {
-            std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
-        }
-        return oResult;
-    }
-
+    /*
     virtual UBigInt findOverflowCounts(uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe, bool verbose)
     {
         bool bHandled = false;
@@ -1268,44 +1162,7 @@ public:
         return oReturn;
 
     }
-
-    TSX::tsx_key_t makeOverflowReprobe(uint32_t iReprobe, uint32_t iPerfReprobe)
-    {
-
-        uint32_t iReprobeLength = m_iL;
-        uint32_t iPerfReprobeBits = (uint32_t) std::floor(iReprobeLength/2.0);
-
-        TSX::tsx_key_t oRet = UBigInt(iReprobeLength, true, m_pPool);
-        oRet.resize(iReprobeLength);
-        TSX::tsx_key_t oReprobe = UBigInt(iReprobe, m_pPool);
-        oReprobe.resize(iReprobeLength);
-        TSX::tsx_key_t oPerfReprobe = UBigInt(iPerfReprobe, m_pPool);
-        oPerfReprobe.resize(iReprobeLength);
-
-        oRet = oRet | oReprobe;
-        oRet = oRet << iReprobeLength-iPerfReprobeBits;
-        oRet = oRet | oPerfReprobe;
-
-        return oRet;
-
-    }
-
-    bool positionMatchesOverflowReprobe(uint64_t pos, TSX::tsx_key_t& key, uint32_t iReprobe, uint32_t iPerfReprobe)
-    {
-
-        // get key from position
-        TSX::tsx_keyval_t oKeyVal = getElement(pos);
-        TSX::tsx_key_t oKey = this->getKeyFromKeyVal(oKeyVal);
-
-        TSX::tsx_key_t oReprobe = this->makeOverflowReprobe(iReprobe, iPerfReprobe);//iReprobe, this->m_pPool);
-        oReprobe.resize(2*m_iK);
-
-        // extract position reprobe and compare with reprobe value
-        bool reprobeMatch = (oKey & m_mask_reprobe_func) == oReprobe;
-
-        return reprobeMatch;
-
-    }
+     */
 
 
     virtual uint8_t handleOverflow_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPos, TSX::tsx_key_t& basekey, uint32_t iReprobe, uint32_t iInitialReprobes, bool verbose=false)
@@ -1318,7 +1175,7 @@ public:
         std::string sTestStr = "AACAGCGTTTCGTC";
         UBigInt sTest = fromSequence(sTestStr, m_pPool);
         bool isCurTest = sTest == kmer;
-        isCurTest = true;
+        isCurTest = false;
 
         sTestStr = toSequence(kmer);
 
@@ -1398,6 +1255,8 @@ public:
                 // transaction completes here
                 _xend();
                 asm volatile("":::"memory");
+
+                m_setUsedPositions.insert(iPos);
 
                 if (isCurTest)
                 {
@@ -1486,10 +1345,25 @@ public:
 
 protected:
 
-    void initialiseLocks()
-    {
-    }
 
+    SBIGINT** m_pTMP_KEYVAL;
+    SBIGINT** m_pTMP_VALUE;
+
+    virtual void initialiseLocks()
+    {
+
+        m_pTMP_KEYVAL = (SBIGINT**) malloc(sizeof(SBIGINT*) * m_iThreads);
+        m_pTMP_VALUE = (SBIGINT**) malloc(sizeof(SBIGINT*) * m_iThreads);
+
+
+        for (uint8_t i = 0; i < m_iThreads; ++i)
+        {
+            m_pTMP_KEYVAL[i] = getEmptySBIGINT(m_iKeyValBits);
+            m_pTMP_VALUE[i] = getEmptySBIGINT(m_iKeyValBits);
+        }
+
+
+    }
 
 
     /**

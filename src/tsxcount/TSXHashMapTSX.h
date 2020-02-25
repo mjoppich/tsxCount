@@ -83,7 +83,7 @@ public:
                 TSX::tsx_key_t updkey = this->makeKey(key, iReprobes);
 
                 // no overflow can happen here ...
-                CIncrementElement oINC = this->incrementElement(iPos, key, iReprobes, false);
+                CIncrementElement oINC = this->incrementElement(iPos, key, iReprobes, 0, false);
                 CIncrementElement* pINC = &(oINC);
                 TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
                 TSX::tsx_keyval_t* pSavedKey = &savedkey;
@@ -163,7 +163,7 @@ public:
 
                 if ((bIsKmerStart) && (bMatchesKey)) {
 
-                    CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobes, false);
+                    CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobes, 0, false);
                     std::vector<CIncrementElement> vOPS;
                     vOPS.insert(vOPS.end(), incRet);
 

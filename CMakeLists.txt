@@ -153,6 +153,8 @@ file(GLOB tsxCount_SRC
 ADD_EXECUTABLE(tsxCount ${tsxCount_SRC} ${tsxCount_H})
 target_include_directories(tsxCount PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCount tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
+target_compile_options(tsxCount PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${OpenMP_CXX_FLAGS})
+
 install(TARGETS tsxCount DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 
