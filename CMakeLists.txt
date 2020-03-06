@@ -171,7 +171,20 @@ target_include_directories(tsxCountPThread PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sr
 TARGET_LINK_LIBRARIES(tsxCountPThread PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads)
 install(TARGETS tsxCountPThread DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
+# Main app
+file(GLOB tsxCountPerf_H
+        "src/mains/testExecution.h"
+        )
 
+file(GLOB tsxCountPerf_SRC
+        "src/mains/main_perf.cpp"
+        )
+ADD_EXECUTABLE(tsxCountPerf ${tsxCountPerf_SRC} ${tsxCountPerf_H})
+target_include_directories(tsxCountPerf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+TARGET_LINK_LIBRARIES(tsxCountPerf PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
+target_compile_options(tsxCountPerf PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+
+install(TARGETS tsxCountPerf DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 # Main app
 file(GLOB tsxCountOMP_H

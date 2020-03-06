@@ -53,6 +53,10 @@ public:
         bool success = false;
 
         if (this->canAcquireLock(iThreadID, iArrayPos)) {
+
+            //std::cerr << "Locked Pos " << iArrayPos << " for thread " << (int) iThreadID << std::endl;
+
+
             m_pLocked[iThreadID].insert(m_pLocked[iThreadID].end(), iArrayPos);
             success = true;
         }

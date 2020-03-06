@@ -19,6 +19,7 @@
 #include <tsxcount/TSXHashMapTSXSmall.h>
 #include <tsxcount/TSXHashMapCAS.h>
 #include <tsxcount/TSXHashMapOMPPerf.h>
+#include <tsxcount/TSXHashMapPerf.h>
 
 const char *argp_program_version = "tsxCount 1.0";
 const char *argp_program_bug_address = "joppich@bio.ifi.lmu.de";
@@ -34,8 +35,8 @@ static struct argp_option options[] = {
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
 };
-enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONS, OMPPERF };
-const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TRANSACTIONS/TSX", "OMPPERF" };
+enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONS, OMPPERF, SERIALPERF };
+const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TRANSACTIONS/TSX", "OMPPERF", "SERIALPERF" };
 
 struct arguments {
     uint16_t k,l,storagebits;
@@ -53,6 +54,9 @@ tsx_mode strToMode(char* pArg)
     if (argStr == "SERIAL")
     {
         return tsx_mode::SERIAL;
+    } else if (argStr == "SERIALPERF")
+    {
+        return tsx_mode::SERIALPERF;
     } else if (argStr == "PTHREAD")
     {
         return tsx_mode::PTHREAD;
@@ -257,6 +261,18 @@ int main(int argc, char *argv[])
             }
             break;
 
+        case SERIALPERF:
+            std::cerr << "Creating TSXHashMap SERIALPERF" << std::endl;
+            pMap = new TSXHashMapPerf(arguments.l, arguments.storagebits, arguments.k);
+
+            if (arguments.threads != 1)
+            {
+                std::cerr << "Requesting to run SERIALPERF with Threads != 1 => EXIT(0)" << std::endl;
+                return 0;
+            }
+            break;
+
+
         case PTHREAD:
             std::cerr << "Creating TSXHashMap PTHREAD" << std::endl;
             pMap = new TSXHashMapPThread(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
@@ -267,7 +283,7 @@ int main(int argc, char *argv[])
             pMap = new TSXHashMapOMP(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
         case OMPPERF:
-            std::cerr << "Creating TSXHashMap OMP" << std::endl;
+            std::cerr << "Creating TSXHashMap OMPPERF" << std::endl;
             pMap = new TSXHashMapOMPPerf(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
         case CAS:
