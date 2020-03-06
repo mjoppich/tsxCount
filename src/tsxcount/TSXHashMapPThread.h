@@ -34,10 +34,6 @@ public:
 
 protected:
 
-    void setThreads(uint8_t iThreads)
-    {
-        m_iThreads = iThreads;
-    }
 
     virtual void initialiseLocks()
     {

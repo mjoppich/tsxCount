@@ -35,7 +35,6 @@ public:
 
 
         omp_lock_hint_t lockHint = omp_lock_hint_speculative;
-
         omp_init_lock_with_hint(&m_oOMPLock, lockHint );
         //omp_init_lock(&m_oOMPLock);
 

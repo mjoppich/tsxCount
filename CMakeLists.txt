@@ -40,7 +40,7 @@ SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
 SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 message(STATUS "Checking OpenMP")
 find_package(OpenMP REQUIRED)
@@ -188,6 +188,20 @@ target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX
 
 install(TARGETS tsxCountOMP DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
+# Main app
+file(GLOB tsxCountOMPPERF_H
+        "src/mains/testExecution.h"
+        )
+
+file(GLOB tsxCountOMPPERF_SRC
+        "src/mains/main_ompperf.cpp"
+        )
+ADD_EXECUTABLE(tsxCountOMPPERF ${tsxCountOMPPERF_SRC} ${tsxCountOMPPERF_H})
+target_include_directories(tsxCountOMPPERF PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+TARGET_LINK_LIBRARIES(tsxCountOMPPERF PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
+target_compile_options(tsxCountOMPPERF PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+
+install(TARGETS tsxCountOMPPERF DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 # Main app
 file(GLOB tsxCountTSX_H
@@ -237,6 +251,22 @@ target_compile_options(tsxCountTSXPERF PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${
 
 TARGET_LINK_LIBRARIES(tsxCountTSXPERF PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountTSXPERF DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+# Main cas
+file(GLOB tsxCountCAS_H
+        "src/mains/testExecution.h"
+        )
+
+file(GLOB tsxCountCAS_SRC
+        "src/mains/main_cas.cpp"
+        )
+ADD_EXECUTABLE(tsxCountCAS ${tsxCountCAS_SRC} ${tsxCountCAS_H})
+target_include_directories(tsxCountCAS PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_compile_options(tsxCountCAS PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm ${OpenMP_CXX_FLAGS})
+
+TARGET_LINK_LIBRARIES(tsxCountCAS PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
+install(TARGETS tsxCountCAS DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 
 MESSAGE("")

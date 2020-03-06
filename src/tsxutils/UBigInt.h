@@ -27,7 +27,8 @@
 #define BITSTOFIELDS(x) (x >> 3)
 #endif
 
-typedef uint8_t FIELDTYPE;
+#include <src/tsxcount/commons.h>
+
 
 class UBigInt;
 

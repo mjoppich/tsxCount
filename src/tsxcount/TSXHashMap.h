@@ -144,8 +144,6 @@ public:
         m_pHashingFunction = new BijectiveKMapping(m_iK, this->m_pPool);
 
 
-        this->setThreads(2);
-
     }
 
     virtual ~TSXHashMap()
@@ -524,7 +522,10 @@ public:
 
         if (!bFound)
         {
-            std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+            if (verbose)
+            {
+                std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+            }
         }
         return oResult;
     }
@@ -663,6 +664,63 @@ public:
 protected:
 
 
+    TSX::tsx_kmer_t fromSequence(std::string& seq, MemoryPool<FIELDTYPE>* pPool)
+    {
+
+        UBigInt oRet(seq.length()*2, false, pPool);
+        bool hadN = false;
+
+        for (size_t i = 0; i < seq.length(); ++i)
+        {
+
+            //size_t iBitPos = 2*(seq.length() -1-i);
+            size_t iBitPos = 2*i;
+
+            switch (seq.at(i))
+            {
+                case 'A': // 0 00
+
+                    oRet.setBit(iBitPos, 0);
+                    oRet.setBit(iBitPos+1, 0);
+
+                    break;
+
+                case 'C': // 1 01
+
+                    oRet.setBit(iBitPos, 1);
+                    oRet.setBit(iBitPos+1, 0);
+
+                    break;
+
+                case 'G': // 2 10
+
+                    oRet.setBit(iBitPos, 0);
+                    oRet.setBit(iBitPos+1, 1);
+
+                    break;
+
+                case 'T': // 3 11
+                    oRet.setBit(iBitPos, 1);
+                    oRet.setBit(iBitPos+1, 1);
+                    break;
+
+                default: // random e.g. N
+
+                    uint8_t iBit1 = rand() % 2;
+                    uint8_t iBit2 = rand() % 2;
+
+                    oRet.setBit(iBitPos, iBit1);
+                    oRet.setBit(iBitPos+1, iBit2);
+
+                    hadN = true;
+
+                    break;
+            }
+        }
+
+        return oRet;
+
+    }
 
     virtual void initialiseLocks()
     {

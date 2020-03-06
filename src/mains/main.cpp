@@ -17,6 +17,8 @@
 #include <tsxcount/TSXHashMapTSXPerf.h>
 #include <tsxcount/TSXHashMapOMP.h>
 #include <tsxcount/TSXHashMapTSXSmall.h>
+#include <tsxcount/TSXHashMapCAS.h>
+#include <tsxcount/TSXHashMapOMPPerf.h>
 
 const char *argp_program_version = "tsxCount 1.0";
 const char *argp_program_bug_address = "joppich@bio.ifi.lmu.de";
@@ -32,8 +34,8 @@ static struct argp_option options[] = {
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
 };
-enum tsx_mode{ SERIAL, PTHREAD, OMP, TRANSACTIONS };
-const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "TRANSACTIONS/TSX" };
+enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONS, OMPPERF };
+const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TRANSACTIONS/TSX", "OMPPERF" };
 
 struct arguments {
     uint16_t k,l,storagebits;
@@ -57,6 +59,13 @@ tsx_mode strToMode(char* pArg)
     } else if (argStr == "OMP")
     {
         return tsx_mode::OMP;
+    } else if (argStr == "OMPPERF")
+    {
+        return tsx_mode::OMPPERF;
+
+    } else if (argStr == "CAS")
+    {
+        return tsx_mode::CAS;
     } else if (argStr == "TRANSACTIONS")
     {
         return tsx_mode::TRANSACTIONS;
@@ -93,14 +102,11 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
 
     const size_t iMaxCount = 2048*4*16;
 
-    uint8_t threads = 4;
-    pMap->setThreads(threads);
-
-    std::cout << "Running on " << (int) threads << " threads" << std::endl;
-    omp_set_dynamic(0);
-
-    threads = pMap->getThreads();
+    uint8_t threads = pMap->getThreads();
     omp_set_num_threads(pMap->getThreads());
+
+    std::cout << "Running on " << (int) omp_get_max_threads() << " threads" << std::endl;
+    omp_set_dynamic(0);
 
     /*
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
@@ -127,7 +133,7 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
             while (pReader->hasNext())
             {
 
-                std::vector<FASTQEntry>* pEntries = pReader->getEntries(10);
+                std::vector<FASTQEntry>* pEntries = pReader->getEntries(40);
                 uint64_t iPosOfInterest = 0;
 
 #pragma omp task firstprivate(pEntries) shared(iPosOfInterest)
@@ -150,27 +156,17 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
                         uint32_t iAddedKmers = 0;
                         uint32_t iTotalKmers = allKmers.size();
 
-
                         for (auto kmerStr : allKmers)
                         {
-
                             TSX::tsx_kmer_t oKmer = TSXSeqUtils::fromSequence(kmerStr, pPool);
                             bool vadd = false;
                             std::vector<uint64_t> vAllPos;
 
                             pMap->addKmer(oKmer, verbose); //vadd
                             //iAddedKmers += 1;
-
-
                         }
-
-
                     }
 
-#pragma omp critical
-                    {
-                        pMap->print_stats();
-                    }
 
                     delete pEntries;
                 }
@@ -188,16 +184,16 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
 
     std::cout << "Added a total of " << pMap->getKmerCount() << " different kmers" << std::endl;
 
-    std::map<std::string, uint32_t> kmer2c = loadReferences(sFileName + "." + std::to_string(iK) + ".count");
-
-
-    // checking counts
-    std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
-    std::cout << "Manual counts: " << kmer2c.size() << std::endl;
-
-
     if (pARGP->check)
     {
+        std::map<std::string, uint32_t> kmer2c = loadReferences(sFileName + "." + std::to_string(iK) + ".count");
+
+
+        // checking counts
+        std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
+        std::cout << "Manual counts: " << kmer2c.size() << std::endl;
+
+
 #pragma omp parallel
         {
 #pragma omp single
@@ -253,6 +249,12 @@ int main(int argc, char *argv[])
         case SERIAL:
             std::cerr << "Creating TSXHashMap SERIAL" << std::endl;
             pMap = new TSXHashMap(arguments.l, arguments.storagebits, arguments.k);
+
+            if (arguments.threads != 1)
+            {
+                std::cerr << "Requesting to run SERIAL with Threads != 1 => EXIT(0)" << std::endl;
+                return 0;
+            }
             break;
 
         case PTHREAD:
@@ -263,6 +265,14 @@ int main(int argc, char *argv[])
         case OMP:
             std::cerr << "Creating TSXHashMap OMP" << std::endl;
             pMap = new TSXHashMapOMP(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
+            break;
+        case OMPPERF:
+            std::cerr << "Creating TSXHashMap OMP" << std::endl;
+            pMap = new TSXHashMapOMPPerf(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
+            break;
+        case CAS:
+            std::cerr << "Creating TSXHashMap CAS" << std::endl;
+            pMap = new TSXHashMapCAS(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
 
         case TRANSACTIONS:
@@ -282,6 +292,7 @@ int main(int argc, char *argv[])
     pMap->print_stats();
 
     TSXHashMapTSXPerf* pPerfTSX = NULL;
+    TSXHashMapCAS* pCAS = NULL;
     if (pPerfTSX = dynamic_cast<TSXHashMapTSXPerf*>(pMap))
     {
 
@@ -289,10 +300,17 @@ int main(int argc, char *argv[])
         std::cerr << "adds: " << pPerfTSX->iAddCount << std::endl;
         std::cerr << "add calls: " << pPerfTSX->iAddKmerCount << std::endl;
         std::cerr << "aborts calls: " << pPerfTSX->iAborts << std::endl;
+    } else if (pCAS = dynamic_cast<TSXHashMapCAS*>(pMap))
+    {
+
+        std::cerr << "Used fields: " << pCAS->getUsedPositions() << std::endl;
+        std::cerr << "adds: " << pCAS->iAddCount << std::endl;
+        std::cerr << "add calls: " << pCAS->iAddKmerCount << std::endl;
+        std::cerr << "aborts calls: " << pCAS->iAborts << std::endl;
     }
 
 
-    return 1;
+    return 0;
 
 
 }

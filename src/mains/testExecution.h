@@ -51,16 +51,16 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std
     {
 #pragma omp critical
         {
-            std::cerr << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;
+            std::cout << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;
 
 
             UBigInt oRes2 = pMap->getKmerCount(kmer, true);
             if (pKmer != NULL)
             {
-                std::cerr << " " << *pKmer;
+                std::cout << " " << *pKmer;
             }
 
-            std::cerr <<  std::endl;
+            std::cout <<  std::endl;
         };
 
     }
@@ -116,28 +116,22 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
     const size_t iMaxCount = 2048*4*16;
 
-    uint8_t threads = 4;
-    pMap->setThreads(threads);
+    uint8_t threads = pMap->getThreads();
+    omp_set_num_threads(pMap->getThreads());
 
     std::cout << "Running on " << (int) threads << " threads" << std::endl;
     omp_set_dynamic(0);
 
-    if (!parallel)
-    {
-        omp_set_num_threads(1);
-        threads = 1;
-    } else {
-        threads = pMap->getThreads();
-        omp_set_num_threads(pMap->getThreads());
-    }
+
 
 
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small2_t7.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
-    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.5000.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.1000.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.5000.fastq";
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.8000.fastq";
-    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
 
@@ -149,7 +143,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 #pragma omp master
         {
             bool exitNow = false;
-            bool verbose = false;
+            bool verbose = true;
 
             while (pReader->hasNext())
             {
@@ -177,7 +171,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                         uint32_t iAddedKmers = 0;
                         uint32_t iTotalKmers = allKmers.size();
 
-                        std::string targetKmer = "TTCCATTCCATTCC";
+                        std::string targetKmer = "TCCATCCATTCCAT";
 
                         for (auto kmerStr : allKmers)
                         {
