@@ -104,7 +104,27 @@ public:
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
             PREFETCH = pPos[0];
-            asm volatile("":::"memory");
+
+            __builtin_prefetch(pPos,0,1);
+            __builtin_prefetch(pSavedKey->m_pArray,0,1);
+            __builtin_prefetch(pKeyReprobeShiftUBIGINT->m_pArray,0,1);
+
+        
+	    uint8_t i = 0;
+	    FIELDTYPE iVal = 0;
+	    for ( i = 0; i < pSavedKey->m_iFields; ++i)
+	    {
+		    std::cout << (int) iVal;
+		    iVal = pSavedKey->m_pArray[i];
+		    std::cout << (int) iVal;
+		    iVal = pPos[i];
+		    std::cout << (int) iVal;
+		    iVal = pKeyReprobeShiftUBIGINT->m_pArray[i];
+		    std::cout << (int) iVal << std::endl;
+	    }
+	
+	
+	    asm volatile("":::"memory");
 
             int iinc=0;
 
@@ -259,13 +279,13 @@ public:
 
 
                 } else {
-                    
+                    exit(111);
                     ++iAborts;
                 }
 
                 if (iTotalAborts % 100000 == 0)
                 {
-                    std::cout << "aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
+                    std::cout << "addkmer aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                 }
             }
 
