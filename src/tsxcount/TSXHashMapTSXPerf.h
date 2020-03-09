@@ -466,10 +466,10 @@ public:
                         }
                     }
 
-                    UBigInt value = fromStructToClass(pValue, m_pPool);
-                    UBigInt saved = fromStructToClass(pKeyVal, m_pPool);
+                    //UBigInt value = fromStructToClass(pValue, m_pPool);
+                    //UBigInt saved = fromStructToClass(pKeyVal, m_pPool);
 
-                    std::cout << "after inc position " << elemEmpty << " " << iPosition << " " << value.to_string() << " " << saved.to_string() << std::endl;
+                    //std::cout << "after inc position " << elemEmpty << " " << iPosition << " " << value.to_string() << " " << saved.to_string() << std::endl;
                 }
 
             }

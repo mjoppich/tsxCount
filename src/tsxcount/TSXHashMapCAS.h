@@ -427,6 +427,7 @@ public:
                         iAddStatus= this->incrementElement_tsx(kmer, iPos, basekey, iReprobes, iReprobes, false, verbose);
                     }
 
+                    /*
                     uint64_t afterCount = this->getKmerCount(kmer).toUInt();
 
                     if (isCurTest)
@@ -438,6 +439,7 @@ public:
                     {
                         std::cout << "ERROR JUST OCCURRED!" << std::endl;
                     }
+                     */
 
                     if (iAddStatus == 2)
                     {
