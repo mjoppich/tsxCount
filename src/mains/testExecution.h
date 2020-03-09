@@ -126,8 +126,9 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
 
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
+    sFileName = "../data/small_t7.1000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.1000.fastq";
-    sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
+    //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.5000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.8000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";

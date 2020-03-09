@@ -335,14 +335,19 @@ public:
             FIELDTYPE *pPos = m_pCounterArray + iStartPos;
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
-            PREFETCH = pPos[0];
-
             TSX::tsx_val_t value = UBigInt(m_iStorageBits, true, this->m_pPool);
 
             SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
             SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
             uint8_t i;
             bool elemEmpty = false;
+
+            __builtin_prefetch(pPos,0,1);
+            __builtin_prefetch(pKeyVal,0,1);
+            __builtin_prefetch(pValue,0,1);
+
+            __builtin_prefetch(m_mask_value_key.m_pArray,0,1);
+            __builtin_prefetch(m_mask_key_value.m_pArray,0,1);
 
             asm volatile("":: :"memory");
 
