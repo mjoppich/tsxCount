@@ -109,22 +109,18 @@ public:
             __builtin_prefetch(pSavedKey->m_pArray,0,1);
             __builtin_prefetch(pKeyReprobeShiftUBIGINT->m_pArray,0,1);
 
-        
-	    uint8_t i = 0;
-	    FIELDTYPE iVal = 0;
-	    for ( i = 0; i < pSavedKey->m_iFields; ++i)
-	    {
-		    std::cout << (int) iVal;
-		    iVal = pSavedKey->m_pArray[i];
-		    std::cout << (int) iVal;
-		    iVal = pPos[i];
-		    std::cout << (int) iVal;
-		    iVal = pKeyReprobeShiftUBIGINT->m_pArray[i];
-		    std::cout << (int) iVal << std::endl;
-	    }
-	
-	
-	    asm volatile("":::"memory");
+            uint8_t i = 0;
+            FIELDTYPE iVal = 0;
+            for ( i = 0; i < pSavedKey->m_iFields; ++i)
+            {
+                iVal = pSavedKey->m_pArray[i];
+                iVal = pPos[i];
+                iVal = pKeyReprobeShiftUBIGINT->m_pArray[i];
+            }
+            SBIGINT::SBIGINT *pKeyVal = m_pTMP_KEYVAL[iThreadID];
+            SBIGINT::SBIGINT *pValue = m_pTMP_VALUE[iThreadID];
+
+            asm volatile("":::"memory");
 
             int iinc=0;
 
@@ -134,11 +130,21 @@ public:
                 //this->performIncrement(&incRet);
                 // increment element
 
-                bool elemEmpty=true;
-                pSavedKey->copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
-                pSavedKey->bitAnd(m_mask_key_value);
+                SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+
+                for (uint8_t i = 0; i < pKeyVal->iFields; ++i) {
+                    pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_value_key.m_pArray[i];
+                    pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
+                }
+
+                bool elemEmpty = SBIGINT::isZero(pKeyVal, m_iKeyValBits);
+
+
+                //pSavedKey->copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
+                //pSavedKey->bitAnd(m_mask_key_value);
 
                 // check elements are equal
+                /*
                 for (uint8_t ei=0; ei < pSavedKey->m_iFields; ++ei)
                 {
                     if (pSavedKey->m_pArray[ei] != 0)
@@ -146,16 +152,24 @@ public:
                         elemEmpty = false;
                     }
                 }
+                 */
 
                 if (!elemEmpty)
                 {
                     _xabort(0xff);
                 }
 
-                pKeyReprobeShiftUBIGINT->m_pArray[0] = pKeyReprobeShiftUBIGINT->m_pArray[0] | 1;
+                for (uint8_t i = 0; i < pKeyReprobeShiftUBIGINT->m_iFields; ++i) {
+                    pKeyVal->pdata[i] = pKeyReprobeShiftUBIGINT->m_pArray[i];
+                }
+                pKeyVal->pdata[0] = pKeyVal->pdata[0] | 1;
+
+                SBIGINT::storeInMemory(pKeyVal->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE)*8);
+
+                //pKeyReprobeShiftUBIGINT->m_pArray[0] = pKeyReprobeShiftUBIGINT->m_pArray[0] | 1;
 
                 //oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
-                (*pKeyReprobeShiftUBIGINT).copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
+                //(*pKeyReprobeShiftUBIGINT).copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
 
                 // transaction completes here
                 _xend();
