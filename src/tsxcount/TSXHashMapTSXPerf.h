@@ -254,10 +254,6 @@ public:
                         continue;
                     }
 
-
-
-
-
                 } else {
                     
                     ++iAborts;
