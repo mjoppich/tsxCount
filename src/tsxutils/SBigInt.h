@@ -390,9 +390,7 @@ namespace SBIGINT {
         }
 
         uint32_t iShift = pRes->iFieldSize - procs.rem;
-
         FIELDTYPE thisRemain = pRes->pdata[checkIdx] << iShift;
-
         bool result = (thisRemain == 0);
 
         return result;

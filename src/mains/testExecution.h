@@ -167,6 +167,8 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
                         FASTQEntry* pEntry = &(pEntries->at(i));
 
                         std::string sSeq = pEntry->getSequence();
+                        //std::cout << sSeq << std::endl;
+
                         std::vector<std::string> allKmers = createKMers(sSeq, iK, pPool);
 
                         uint32_t iAddedKmers = 0;

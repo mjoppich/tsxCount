@@ -297,7 +297,6 @@ public:
 
 
             TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
-            TSX::tsx_keyval_t* pSavedKey = &savedkey;
             TSX::tsx_keyval_t* pKeyReprobeShiftUBIGINT = &key_reprobe_shift;
 
             uint64_t iBitsToPos = (iPos)*m_iKeyValBits;

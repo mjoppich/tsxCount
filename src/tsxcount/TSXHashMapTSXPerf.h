@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include <stack>
 
-
+#include <xmmintrin.h>
 #include <immintrin.h>
 #include <unistd.h>
 #include <rtmintrin.h>
@@ -74,6 +74,7 @@ public:
         UBigInt uBigOne = UBigInt(1, m_pPool);
 
         UBigInt* p_mask_func_reprobe = &m_mask_func_reprobe;
+        uint status;
 
         while ( iReprobes < m_iMaxReprobes ) {
 
@@ -87,13 +88,10 @@ public:
             uint64_t iPos = this->getPosition(basekey, iReprobes);
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
 
-
             key_reprobe_shift.resize(m_iKeyValBits);
             key_reprobe_shift = (key_reprobe_shift << m_iStorageBits);
 
-
             TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
-            TSX::tsx_keyval_t* pSavedKey = &savedkey;
             TSX::tsx_keyval_t* pKeyReprobeShiftUBIGINT = &key_reprobe_shift;
 
             uint64_t iBitsToPos = (iPos)*m_iKeyValBits;
@@ -101,66 +99,45 @@ public:
             uint32_t iStartOffset = iBitsToPos-((sizeof(FIELDTYPE)*8) * iStartPos);
             FIELDTYPE* pPos = m_pCounterArray + iStartPos;
 
-
             // THIS PREFETCH is necessary to avoid stupid status==0...
-            PREFETCH = pPos[0];
-
-            __builtin_prefetch(pPos,0,1);
-            __builtin_prefetch(pSavedKey->m_pArray,0,1);
-            __builtin_prefetch(pKeyReprobeShiftUBIGINT->m_pArray,0,1);
-
-            uint8_t i = 0;
-            FIELDTYPE iVal = 0;
-            for ( i = 0; i < pSavedKey->m_iFields; ++i)
-            {
-                iVal = pSavedKey->m_pArray[i];
-                iVal = pPos[i];
-                iVal = pKeyReprobeShiftUBIGINT->m_pArray[i];
-            }
             SBIGINT::SBIGINT *pKeyVal = m_pTMP_KEYVAL[iThreadID];
-            SBIGINT::SBIGINT *pValue = m_pTMP_VALUE[iThreadID];
+            //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+
+            volatile FIELDTYPE prefVal;
+
+            for (uint8_t i = 0; i < pKeyVal->iFields; ++i)
+            {
+                prefVal = pKeyVal->pdata[i];
+                prefVal = m_mask_key_value.m_pArray[i];
+                prefVal = pPos[i];
+            }
+            prefVal = pPos[pKeyVal->iFields];
 
             asm volatile("":::"memory");
 
             int iinc=0;
 
-            uint status;
             if ((status = _xbegin ()) == _XBEGIN_STARTED) {
 
                 //this->performIncrement(&incRet);
                 // increment element
+                uint8_t i = 0;
 
                 SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
-                for (uint8_t i = 0; i < pKeyVal->iFields; ++i) {
-                    pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_value_key.m_pArray[i];
+                for (i = 0; i < pKeyVal->iFields; ++i) {
                     pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
                 }
 
                 bool elemEmpty = SBIGINT::isZero(pKeyVal, m_iKeyValBits);
-
-
-                //pSavedKey->copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
-                //pSavedKey->bitAnd(m_mask_key_value);
-
-                // check elements are equal
-                /*
-                for (uint8_t ei=0; ei < pSavedKey->m_iFields; ++ei)
-                {
-                    if (pSavedKey->m_pArray[ei] != 0)
-                    {
-                        elemEmpty = false;
-                    }
-                }
-                 */
 
                 if (!elemEmpty)
                 {
                     _xabort(0xff);
                 }
 
-                for (uint8_t i = 0; i < pKeyReprobeShiftUBIGINT->m_iFields; ++i) {
-                    pKeyVal->pdata[i] = pKeyReprobeShiftUBIGINT->m_pArray[i];
+                for (i = 0; i < key_reprobe_shift.m_iFields; ++i) {
+                    pKeyVal->pdata[i] = key_reprobe_shift.m_pArray[i];
                 }
                 pKeyVal->pdata[0] = pKeyVal->pdata[0] | 1;
 
@@ -170,6 +147,7 @@ public:
 
                 //oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
                 //(*pKeyReprobeShiftUBIGINT).copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
+
 
                 // transaction completes here
                 _xend();
@@ -289,13 +267,14 @@ public:
                     }
 
                 } else {
-                    exit(111);
+                    //exit(111);
                     ++iAborts;
                 }
 
                 if (iTotalAborts % 100000 == 0)
                 {
                     std::cout << "addkmer aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
+                    std::cout << (int) status << std::endl;
                 }
             }
 
@@ -371,13 +350,6 @@ public:
             SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
             uint8_t i;
             bool elemEmpty = false;
-
-            __builtin_prefetch(pPos,0,1);
-            __builtin_prefetch(pKeyVal,0,1);
-            __builtin_prefetch(pValue,0,1);
-
-            __builtin_prefetch(m_mask_value_key.m_pArray,0,1);
-            __builtin_prefetch(m_mask_key_value.m_pArray,0,1);
 
             asm volatile("":: :"memory");
 
