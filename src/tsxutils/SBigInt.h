@@ -122,7 +122,7 @@ namespace SBIGINT {
         pElem->pdata[pElem->iFields-1] = (pElem->pdata[pElem->iFields-1] >> iShift);
     }
 
-    void getFromMemory(SBIGINT* pRes, uint8_t iOffset, uint16_t iKeyValBits, FIELDTYPE* pData )
+    inline void getFromMemory(SBIGINT* pRes, uint8_t iOffset, uint16_t iKeyValBits, FIELDTYPE* pData )
     {
         uint8_t totalFields = iKeyValBits / pRes->iFieldSize;
         FIELDTYPE iPartOne, iPartTwo;
@@ -150,78 +150,91 @@ namespace SBIGINT {
         }
     }
 
-    void storeInMemory(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uint16_t iBitCount, uint8_t iFieldSize) {
+    inline void storeInMemory(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uint16_t iBitCount, uint8_t iFieldSize) {
+
+        //FIELDTYPE iThisVal, iOldVal, iPartRight, iPartLeft;
+        FIELDTYPE values [4];
+        // thisval = 0
+        // oldval = 1
+        // left = 2
+        // right = 3
+
+        uint8_t iOffset, iBitsRemaining, iFullFields, i;
 
         // how many bits can I copy into first, not fully occupied field?
-        uint8_t iOffset = iBitStart % iFieldSize;
+        iOffset = iBitStart % iFieldSize;
 
         // TODO copy first field
-        FIELDTYPE iThisVal = pSrc[0] << iOffset;
-        FIELDTYPE iOldVal = pDest[0] << (iFieldSize - iOffset);
-        iOldVal = iOldVal >> (iFieldSize - iOffset);
+        values[0] = pSrc[0] << iOffset;
+        values[1] = pDest[0] << (iFieldSize - iOffset);
+        values[1] = values[1] >> (iFieldSize - iOffset);
 
-        pDest[0] = iThisVal | iOldVal;
+        pDest[0] = values[0] | values[1];
 
         // how many bits remain to be copied?
-        uint32_t iBitsRemaining = iBitCount - (iFieldSize - iOffset);
-        // how many full fields are this?
-        div_t fields = div(iBitsRemaining, iFieldSize);
+        iBitsRemaining = iBitCount - (iFieldSize - iOffset);        
+        iFullFields = iBitsRemaining / iFieldSize;
+
+        //uint8_t iRemainFields = iBitsRemaining - iFullFields*iFieldSize;
 
         // copy full fields over
-        FIELDTYPE iPartRight;
-        FIELDTYPE iPartLeft;
-
-        uint32_t i = 0;
-        for ( i = 0; i < fields.quot; ++i)
+        
+        for ( i = 0; i < iFullFields; ++i)
         {
             // TODO copy full fields
-            iPartRight = pSrc[i] >> (iFieldSize-iOffset);
-            iPartLeft = pSrc[i+1] << iOffset;
-            iThisVal = iPartLeft | iPartRight;
+            values[3] = pSrc[i] >> (iFieldSize-iOffset);
+            values[2] = pSrc[i+1] << iOffset;
+            values[0] = values[2] | values[3];
 
-            pDest[i+1] = iThisVal;
+            pDest[i+1] = values[0];
 
             iBitsRemaining -= iFieldSize;
         }
 
+       
         if (iBitsRemaining > 0)
         {
+             
             if (iBitsRemaining <= iOffset)
             {
 
                 // we do not need a rest from the next field
-                iPartRight = pSrc[fields.quot] << (iFieldSize-iOffset);
-                iPartRight = iPartRight << (iOffset-iBitsRemaining);
-                iPartRight = iPartRight >> (iOffset-iBitsRemaining);
-                iPartRight = iPartRight >> iFieldSize-iOffset;
+                values[3] = pSrc[iFullFields] << (iFieldSize-iOffset);
+                values[3] = values[3] << (iOffset-iBitsRemaining);
+                values[3] = values[3] >> (iOffset-iBitsRemaining);
+                values[3] = values[3] >> iFieldSize-iOffset;
 
-                iOldVal = pDest[fields.quot+1];
-                iOldVal = iOldVal >> iBitsRemaining;
-                iOldVal = iOldVal << iBitsRemaining;
+                values[1] = pDest[iFullFields+1];
+                values[1] = values[1] >> iBitsRemaining;
+                values[1] = values[1] << iBitsRemaining;
 
-                pDest[fields.quot+1] = iOldVal | iPartRight;
+                pDest[iFullFields+1] = values[1] | values[3];
 
             } else {
 
                 // we need a rest from the next field
-                iPartRight = pSrc[fields.quot] >> (iFieldSize-iOffset);
+                values[3] = pSrc[iFullFields] >> (iFieldSize-iOffset);
 
-                uint32_t iRemaining = iBitsRemaining - iOffset;
+                // values[0] is used to store iRemaing
+                //iRemaining = iBitsRemaining - iOffset;
+                values[0] = iBitsRemaining - iOffset;
 
                 // need the rightmost iRemaining bits
-                iPartLeft = pSrc[fields.quot+1] << (iFieldSize-iRemaining); // clears all but iRemaining bits
-                iPartLeft = iPartLeft >> (iFieldSize-iRemaining);
-                iPartLeft = iPartLeft << iOffset;
+                values[2] = pSrc[iFullFields+1] << (iFieldSize-values[0]); // clears all but iRemaining bits
+                values[2] = values[2] >> (iFieldSize-values[0]);
+                values[2] = values[2] << iOffset;
 
-                iThisVal = iPartLeft | iPartRight;
+                values[0] = values[2] | values[3];
 
-                iOldVal = pDest[fields.quot+1];
-                iOldVal = iOldVal >> iBitsRemaining;
-                iOldVal = iOldVal << iBitsRemaining;
+                values[1] = pDest[iFullFields+1];
+                values[1] = values[1] >> iBitsRemaining;
+                values[1] = values[1] << iBitsRemaining;
 
-                pDest[fields.quot+1] = iOldVal | iThisVal;
+                pDest[iFullFields+1] = values[1] | values[0];
 
             }
+            
+
             /*
             std::cout << "Having i: " << i << " and fields " << fields.quot << std::endl;
             std::cout << "Using the last bits: " << iBitsRemaining << std::endl;
@@ -295,10 +308,10 @@ namespace SBIGINT {
 
     }
 
-    SBIGINT* fromClassToStruct(UBigInt* pElem)
+    
+    SBIGINT* fromClassToStruct(UBigInt* pElem, SBIGINT* ret)
     {
 
-        SBIGINT* ret = getEmptySBIGINT(pElem->m_iBits, pElem->m_iFields);
 
         for (uint8_t i = 0; i < pElem->m_iFields; ++i)
         {
@@ -308,6 +321,16 @@ namespace SBIGINT {
         return ret;
 
     }
+
+    SBIGINT* fromClassToStruct(UBigInt* pElem)
+    {
+
+        SBIGINT* ret = getEmptySBIGINT(pElem->m_iBits, pElem->m_iFields);
+
+        return fromClassToStruct(pElem, ret);
+
+    }
+
 
     UBigInt fromStructToClass(SBIGINT* pElem, MemoryPool<FIELDTYPE>* pPool)
     {

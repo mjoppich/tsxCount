@@ -19,7 +19,101 @@
 #include <src/tsxutils/SBigInt.h>
 
 
+inline void myStoreMem(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uint16_t iBitCount, uint8_t iFieldSize) {
 
+
+
+        // how many bits can I copy into first, not fully occupied field?
+        iBitStart = iBitStart % iFieldSize;
+
+
+        //FIELDTYPE iThisVal, iOldVal, iPartRight, iPartLeft;
+        FIELDTYPE values [4];
+        // thisval = 0
+        // oldval = 1
+        // left = 2
+        // right = 3
+
+        uint8_t iBitsRemaining, iFullFields, i;
+
+        // TODO copy first field
+        values[0] = pSrc[0] << iBitStart;
+        values[1] = pDest[0] << (iFieldSize - iBitStart);
+        values[1] = values[1] >> (iFieldSize - iBitStart);
+        values[0] = values[0] | values[1];
+        pDest[0] = values[0];// | values[1];
+
+        // how many bits remain to be copied?
+        iBitsRemaining = iBitCount - (iFieldSize - iBitStart);        
+        iFullFields = iBitsRemaining / iFieldSize;
+
+        //uint8_t iRemainFields = iBitsRemaining - iFullFields*iFieldSize;
+
+        // copy full fields over
+        
+        for ( i = 0; i < iFullFields; ++i)
+        {
+            // TODO copy full fields
+            values[3] = pSrc[i] >> (iFieldSize-iBitStart);
+            values[2] = pSrc[i+1] << iBitStart;
+            values[0] = values[2] | values[3];
+
+            pDest[i+1] = values[0];
+
+            iBitsRemaining -= iFieldSize;
+        }
+
+       
+        if (iBitsRemaining > 0)
+        {
+             
+            if (iBitsRemaining <= iBitStart)
+            {
+
+                // we do not need a rest from the next field
+                values[3] = pSrc[iFullFields] << (iFieldSize-iBitStart);
+                values[3] = values[3] << (iBitStart-iBitsRemaining);
+                values[3] = values[3] >> (iBitStart-iBitsRemaining);
+                values[3] = values[3] >> iFieldSize-iBitStart;
+
+                values[1] = pDest[iFullFields+1];
+                values[1] = values[1] >> iBitsRemaining;
+                values[1] = values[1] << iBitsRemaining;
+
+                pDest[iFullFields+1] = values[1] | values[3];
+
+            } else {
+
+                // we need a rest from the next field
+                values[3] = pSrc[iFullFields] >> (iFieldSize-iBitStart);
+
+                // values[0] is used to store iRemaing
+                //iRemaining = iBitsRemaining - iOffset;
+                values[0] = iBitsRemaining - iBitStart;
+
+                // need the rightmost iRemaining bits
+                values[2] = pSrc[iFullFields+1] << (iFieldSize-values[0]); // clears all but iRemaining bits
+                values[2] = values[2] >> (iFieldSize-values[0]);
+                values[2] = values[2] << iBitStart;
+
+                values[0] = values[2] | values[3];
+
+                values[1] = pDest[iFullFields+1];
+                values[1] = values[1] >> iBitsRemaining;
+                values[1] = values[1] << iBitsRemaining;
+
+                pDest[iFullFields+1] = values[1] | values[0];
+
+            }
+            
+
+            /*
+            std::cout << "Having i: " << i << " and fields " << fields.quot << std::endl;
+            std::cout << "Using the last bits: " << iBitsRemaining << std::endl;
+            std::cout<< std::bitset<8>(pDest[fields.quot+1]) << " into field " << fields.quot+1 << " " << static_cast<void*>(pDest + fields.quot+1) << std::endl;
+            */
+        }
+    }
 
 
 
@@ -89,10 +183,8 @@ public:
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
 
             key_reprobe_shift.resize(m_iKeyValBits);
-            key_reprobe_shift = (key_reprobe_shift << m_iStorageBits);
-
-            TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
-            TSX::tsx_keyval_t* pKeyReprobeShiftUBIGINT = &key_reprobe_shift;
+            key_reprobe_shift.shiftLeft(m_iStorageBits);// (key_reprobe_shift << m_iStorageBits);,
+            key_reprobe_shift.m_pArray[0] = key_reprobe_shift.m_pArray[0] | 1;
 
             uint64_t iBitsToPos = (iPos)*m_iKeyValBits;
             uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE)*8);
@@ -101,33 +193,39 @@ public:
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
             SBIGINT::SBIGINT *pKeyVal = m_pTMP_KEYVAL[iThreadID];
-            //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+            SBIGINT::SBIGINT* pKeyReprobeShift = m_pTMP_VALUE[iThreadID];
 
+            SBIGINT::fromClassToStruct(&key_reprobe_shift, pKeyReprobeShift);
+
+            int iinc=0;
+
+            
             volatile FIELDTYPE prefVal;
-
             for (uint8_t i = 0; i < pKeyVal->iFields; ++i)
             {
                 prefVal = pKeyVal->pdata[i];
-                prefVal = m_mask_key_value.m_pArray[i];
+                prefVal = pKeyReprobeShift->pdata[i];
                 prefVal = pPos[i];
+                pPos[i] = prefVal;
             }
             prefVal = pPos[pKeyVal->iFields];
+            pPos[pKeyVal->iFields] = prefVal;
+            
 
+            uint16_t iKeyValBits = m_iKeyValBits;
             asm volatile("":::"memory");
 
-            int iinc=0;
+            uint8_t i = 0;
 
             if ((status = _xbegin ()) == _XBEGIN_STARTED) {
 
                 //this->performIncrement(&incRet);
                 // increment element
-                uint8_t i = 0;
-
                 SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
-                for (i = 0; i < pKeyVal->iFields; ++i) {
-                    pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
-                }
+                //for (i = 0; i < pKeyVal->iFields; ++i) {
+                //    pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
+                //}
 
                 bool elemEmpty = SBIGINT::isZero(pKeyVal, m_iKeyValBits);
 
@@ -136,22 +234,17 @@ public:
                     _xabort(0xff);
                 }
 
-                for (i = 0; i < key_reprobe_shift.m_iFields; ++i) {
-                    pKeyVal->pdata[i] = key_reprobe_shift.m_pArray[i];
-                }
-                pKeyVal->pdata[0] = pKeyVal->pdata[0] | 1;
-
-                SBIGINT::storeInMemory(pKeyVal->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE)*8);
-
-                //pKeyReprobeShiftUBIGINT->m_pArray[0] = pKeyReprobeShiftUBIGINT->m_pArray[0] | 1;
-
-                //oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
-                //(*pKeyReprobeShiftUBIGINT).copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
+                //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+                myStoreMem(pKeyReprobeShift->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE)*8);
 
 
+                //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+                //SBIGINT::storeInMemory(key_reprobe_shift.m_pArray, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE)*8);
                 // transaction completes here
                 _xend();
                 asm volatile("":::"memory");
+
+                //std::cout << "after add and transaction" << std::endl;
 
 
                 // so we can find kmer start positions later without knowing the kmer
@@ -168,6 +261,8 @@ public:
 
                 ++iTotalAborts;
                 if (_XABORT_CODE(status) == 0xff) {
+
+                    //std::cout << "managed abort" << std::endl;
 
                     /*
                      * The first transaction did not succeed because the position is not empty
@@ -275,6 +370,7 @@ public:
                 {
                     std::cout << "addkmer aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                     std::cout << (int) status << std::endl;
+
                 }
             }
 
@@ -1065,7 +1161,7 @@ protected:
             m_pTMP_VALUE[i] = SBIGINT::getEmptySBIGINT(m_iKeyValBits);
         }
 
-
+        std::cout << "keyval and value initialized" << std::endl;
     }
 
 
