@@ -13,8 +13,8 @@
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include <unistd.h>
-#include <rtmintrin.h>
 #include <cmath>
+
 
 #include <src/tsxutils/SBigInt.h>
 
@@ -199,23 +199,30 @@ public:
 
             int iinc=0;
 
-            
+            uint8_t i = 0;
+
             volatile FIELDTYPE prefVal;
-            for (uint8_t i = 0; i < pKeyVal->iFields; ++i)
+            for (i = 0; i < pKeyVal->iFields; ++i)
             {
+                //__atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
+                __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+
                 prefVal = pKeyVal->pdata[i];
                 prefVal = pKeyReprobeShift->pdata[i];
-                prefVal = pPos[i];
-                pPos[i] = prefVal;
+                //prefVal = pPos[i];
+                //pPos[i] = prefVal;
+
+                //
             }
             prefVal = pPos[pKeyVal->iFields];
-            pPos[pKeyVal->iFields] = prefVal;
+            __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+            //pPos[pKeyVal->iFields] = prefVal;
+            //__atomic_fetch_or (pPos+pKeyVal->iFields, pPos[pKeyVal->iFields], __ATOMIC_RELAXED);
             
 
             uint16_t iKeyValBits = m_iKeyValBits;
             asm volatile("":::"memory");
 
-            uint8_t i = 0;
 
             if ((status = _xbegin ()) == _XBEGIN_STARTED) {
 
