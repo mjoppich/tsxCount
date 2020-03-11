@@ -88,6 +88,21 @@ public:
                 TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
                 TSX::tsx_keyval_t* pSavedKey = &savedkey;
 
+                uint64_t iBitsToPos = (pINC->iPosition)*m_iKeyValBits;
+                uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE)*8);
+                uint32_t iStartOffset = iBitsToPos-((sizeof(FIELDTYPE)*8) * iStartPos);
+                FIELDTYPE* pPos = m_pCounterArray + iStartPos;
+
+
+                volatile FIELDTYPE prefVal;
+                uint8_t i;
+                for (i = 0; i < savedkey.m_iFields; ++i)
+                {
+                    //__atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
+                    __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+                }
+                __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+
                 int iinc=0;
 
                 uint status = _xbegin();
@@ -97,12 +112,8 @@ public:
                     // increment element
 
                     bool elemsEqual=true;
-                    uint64_t iBitsToPos = (pINC->iPosition)*m_iKeyValBits;
-                    uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE)*8);
-                    uint32_t iStartOffset = iBitsToPos-((sizeof(FIELDTYPE)*8) * iStartPos);
 
 
-                    FIELDTYPE* pPos = m_pCounterArray + iStartPos;
                     pSavedKey->copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
 
                     // check elements are equal

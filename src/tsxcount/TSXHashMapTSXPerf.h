@@ -206,18 +206,11 @@ public:
             {
                 //__atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
                 __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
-
                 prefVal = pKeyVal->pdata[i];
                 prefVal = pKeyReprobeShift->pdata[i];
-                //prefVal = pPos[i];
-                //pPos[i] = prefVal;
-
-                //
             }
             prefVal = pPos[pKeyVal->iFields];
             __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
-            //pPos[pKeyVal->iFields] = prefVal;
-            //__atomic_fetch_or (pPos+pKeyVal->iFields, pPos[pKeyVal->iFields], __ATOMIC_RELAXED);
             
 
             uint16_t iKeyValBits = m_iKeyValBits;
