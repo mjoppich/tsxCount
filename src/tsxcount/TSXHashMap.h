@@ -1392,7 +1392,10 @@ protected:
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
 
-        std::string sKmerStr = toSequence(*kmer);
+        if (kmer != NULL)
+        {
+            std::string sKmerStr = toSequence(*kmer);
+        }
 
 
         while (iPerformedReprobes < m_iMaxReprobes)
