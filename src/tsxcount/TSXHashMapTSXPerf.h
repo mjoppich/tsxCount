@@ -826,7 +826,8 @@ public:
                 std::cout << "cur test overflow in increment" << " pos="<< iPosition<< std::endl;
             }
             // try to avoid overflow by incrementing func part
-            for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
+            //for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
+            while(true) {
 
                 iIncrementFuncState = this->incrementElement_func(kmer, iPosition, key, reprobes, verbose);
 
@@ -1124,7 +1125,7 @@ public:
                     ++iAborts;
                 }
 
-                if (iTotalAborts % 10 == 0) {
+                if (iTotalAborts % 1000 == 0) {
                     std::cout << "aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                 }
 

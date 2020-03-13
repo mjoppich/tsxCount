@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #include <tsxcount/TSXHashMapTSXPerf.h>
 #include <tsxcount/TSXHashMapOMP.h>
-#include <tsxcount/TSXHashMapTSXSmall.h>
+#include <tsxcount/TSXHashMapTSX.h>
 #include <tsxcount/TSXHashMapCAS.h>
 #include <tsxcount/TSXHashMapOMPPerf.h>
 #include <tsxcount/TSXHashMapPerf.h>
@@ -35,8 +35,8 @@ static struct argp_option options[] = {
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
 };
-enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONS, OMPPERF, SERIALPERF };
-const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TRANSACTIONS/TSX", "OMPPERF", "SERIALPERF" };
+enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONAL, TSXPERF, OMPPERF, SERIALPERF };
+const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TSX", "TSXPERF", "OMPPERF", "SERIALPERF" };
 
 struct arguments {
     uint16_t k,l,storagebits;
@@ -70,15 +70,15 @@ tsx_mode strToMode(char* pArg)
     } else if (argStr == "CAS")
     {
         return tsx_mode::CAS;
-    } else if (argStr == "TRANSACTIONS")
+    } else if (argStr == "TSX")
     {
-        return tsx_mode::TRANSACTIONS;
-    }  else if (argStr == "TSX")
+        return tsx_mode::TRANSACTIONAL;
+    }  else if (argStr == "TSXPERF")
     {
-        return tsx_mode::TRANSACTIONS;
+        return tsx_mode::TSXPERF;
     }
 
-    return tsx_mode::TRANSACTIONS;
+    return tsx_mode::TSXPERF;
 }
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -277,7 +277,6 @@ int main(int argc, char *argv[])
             std::cerr << "Creating TSXHashMap PTHREAD" << std::endl;
             pMap = new TSXHashMapPThread(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
-
         case OMP:
             std::cerr << "Creating TSXHashMap OMP" << std::endl;
             pMap = new TSXHashMapOMP(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
@@ -290,12 +289,14 @@ int main(int argc, char *argv[])
             std::cerr << "Creating TSXHashMap CAS" << std::endl;
             pMap = new TSXHashMapCAS(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
-
-        case TRANSACTIONS:
+        case TRANSACTIONAL:
             std::cerr << "Creating TSXHashMap TRANSACTIONS/TSX" << std::endl;
+            pMap = new TSXHashMapTSX(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
+            break;
+        case TSXPERF:
+            std::cerr << "Creating TSXHashMap TRANSACTIONS/TSXPERF" << std::endl;
             pMap = new TSXHashMapTSXPerf(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
-
         default:
             std::cerr << "Creating TSXHashMap DEFAULT(TRANSACTIONS/TSX)" << std::endl;
 
