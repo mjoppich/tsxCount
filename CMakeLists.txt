@@ -182,7 +182,7 @@ file(GLOB tsxCountPerf_SRC
 ADD_EXECUTABLE(tsxCountPerf ${tsxCountPerf_SRC} ${tsxCountPerf_H})
 target_include_directories(tsxCountPerf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCountPerf PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
-target_compile_options(tsxCountPerf PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+target_compile_options(tsxCountPerf PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm -mprfchw ${OpenMP_CXX_FLAGS})
 
 install(TARGETS tsxCountPerf DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
@@ -197,7 +197,7 @@ file(GLOB tsxCountOMP_SRC
 ADD_EXECUTABLE(tsxCountOMP ${tsxCountOMP_SRC} ${tsxCountOMP_H})
 target_include_directories(tsxCountOMP PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCountOMP PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
-target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+target_compile_options(tsxCountOMP PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm -mprfchw ${OpenMP_CXX_FLAGS})
 
 install(TARGETS tsxCountOMP DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
@@ -212,7 +212,7 @@ file(GLOB tsxCountOMPPERF_SRC
 ADD_EXECUTABLE(tsxCountOMPPERF ${tsxCountOMPPERF_SRC} ${tsxCountOMPPERF_H})
 target_include_directories(tsxCountOMPPERF PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 TARGET_LINK_LIBRARIES(tsxCountOMPPERF PRIVATE ${OpenMP_CXX_FLAGS} tsxcounter ${CMAKE_OPENMP_LIBRARY_NAME} tsxutils Threads::Threads)
-target_compile_options(tsxCountOMPPERF PUBLIC -Wall ${OpenMP_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+target_compile_options(tsxCountOMPPERF PUBLIC -Wall ${OpenMP_CXX_FLAGS} -mrtm -mprfchw ${OpenMP_CXX_FLAGS})
 
 install(TARGETS tsxCountOMPPERF DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
