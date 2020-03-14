@@ -195,6 +195,7 @@ public:
                 }
                  */
 
+                /*
                 std::string sTestStr = toSequence(kmer);
                 UBigInt sTest = fromSequence(sTestStr, m_pPool);
 
@@ -205,6 +206,7 @@ public:
                 {
                     std::cout << sTestStr << " " << bIsKmerStart << " " << bMatchesKey << std::endl;
                 }
+                 */
 
 
                 if ((bIsKmerStart) && (bMatchesKey)) {
@@ -214,6 +216,7 @@ public:
                     uint8_t iAddStatus = 0;
                     uint8_t iOverflowStatus = 0;
 
+                    /*
                     uint64_t beforeCount = 0;
 
                     if (isCurTest)
@@ -221,6 +224,7 @@ public:
                         beforeCount = this->getKmerCount(kmer).toUInt();
                         std::cout << sTestStr << " before increment " << (int) iAddStatus << " " << (int) iOverflowStatus << " count: " << beforeCount << std::endl;
                     }
+                     */
 
 
 
@@ -238,7 +242,7 @@ public:
                      */
 
 
-
+                    /*
                     if (isCurTest)
                     {
                         uint64_t afterCount = this->getKmerCount(kmer).toUInt();
@@ -250,29 +254,34 @@ public:
                             std::cout << "ERROR JUST OCCURRED!" << std::endl;
                         }
                     }
+                     */
 
                     if (iAddStatus == 2)
                     {
-                        if (isCurTest)
+/*                        if (isCurTest)
                         {
                             std::cout << sTestStr << " before overflow" << std::endl;
-                        }
+                        }*/
 
                         while (iOverflowStatus == 0)
                         {
                             iOverflowStatus = this->handleOverflow_tsx(kmer, iPos, basekey, iReprobes, iReprobes, verbose);
                         }
 
+                        /*
                         if (isCurTest)
                         {
                             std::cout << sTestStr << " after overflow increment " << (int) iAddStatus << " " << (int) iOverflowStatus << " count: " << this->getKmerCount(kmer).toUInt() << std::endl;
                         }
+                         */
                     }
 
+                    /*
                     if (isCurTest)
                     {
                         std::cout << sTestStr << " before end " << (int)iAddStatus << " " << (int)iOverflowStatus << std::endl;
                     }
+                     */
 
 
                     this->iAddCount += 1;
@@ -372,12 +381,12 @@ public:
             SBIGINT::SBIGINT *pKeyVal = m_pTMP_KEYVAL[iThreadID];
             SBIGINT::SBIGINT *pValue = m_pTMP_VALUE[iThreadID];
             SBIGINT::SBIGINT *pOrigValue = m_pTMP_ORIGINAL[iThreadID];
-            SBIGINT::SBIGINT *pClear = m_pTMP_CLEAR[iThreadID];
+            //SBIGINT::SBIGINT *pClear = m_pTMP_CLEAR[iThreadID];
             //this->performIncrement(&incRet);
             // increment element
 
             //(*pSavedKey).copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
-            SBIGINT::getFromMemory(pKeyVal, pOrigValue, iStartOffset, m_iKeyValBits, pPos);
+            SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
             //value = (*pSavedKey) &  m_mask_value_key;
 
@@ -473,18 +482,13 @@ public:
             SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
             SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
             SBIGINT::SBIGINT *pOrigValue = m_pTMP_ORIGINAL[iThreadID];
-            SBIGINT::SBIGINT*pClear = m_pTMP_CLEAR[iThreadID];
-
-            m_mask_kv_reprobevalue;
+            //SBIGINT::SBIGINT*pClear = m_pTMP_CLEAR[iThreadID];
 
             bool elemEmpty = false;
-
-
-
             //this->performIncrement(&incRet);
             // increment element
 
-            SBIGINT::getFromMemory(pKeyVal, pOrigValue, iStartOffset, m_iKeyValBits, pPos);
+            SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
             //value = (*pSavedKey) &  m_mask_value_key;
 
             for (uint8_t i = 0; i < pKeyVal->iFields; ++i)
@@ -585,11 +589,11 @@ public:
     uint8_t incrementElement_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, uint32_t iInitialReprobes, bool bKeyIsValue, bool verbose=false)
     {
 
-        std::string sTestStr = "TTCCATTCCATTCC";
-        UBigInt sTest = fromSequence(sTestStr, m_pPool);
+        //std::string sTestStr = "TTCCATTCCATTCC";
+        //UBigInt sTest = fromSequence(sTestStr, m_pPool);
 
-        bool isCurTest = kmer == sTest;
-        isCurTest = false;
+        //bool isCurTest = kmer == sTest;
+        bool isCurTest = false;
         bool handleFuncOverflow = false;
 
         //std::cout << "increment element tsx " << iPosition << std::endl;
@@ -605,19 +609,22 @@ public:
 
             if (iIncrementState == 0)
             {
+                /*
                 if (isCurTest)
                 {
                     std::cout << "simple increment return 0, pos="<< iPosition << std::endl;
                 }
+                 */
                 continue;
 
             } else if (iIncrementState == 1)
             {
-
+                /*
                 if (isCurTest)
                 {
                     std::cout << "return 1 after increment, pos="<< iPosition << std::endl;
                 }
+                 */
 
                 // value increment, everything done
                 return 1;
@@ -627,20 +634,24 @@ public:
                 if (bKeyIsValue)
                 {
 
+                    /*
                     if (isCurTest)
                     {
                         std::cout << "increment returns 2, break, pos="<< iPosition << std::endl;
                     }
+                     */
 
                     handleFuncOverflow = true;
                     break;
 
                 } else {
 
+                    /*
                     if (isCurTest)
                     {
                         std::cout << "increment returns 2, no break, pos="<< iPosition << std::endl;
                     }
+                     */
 
                     //std::cout << "value overflow in pos " << iPosition << std::endl;
                     return 2;
@@ -658,19 +669,23 @@ public:
         if (handleFuncOverflow && bKeyIsValue)
         {
 
+            /*
             if (isCurTest)
             {
                 std::cout << "cur test overflow in increment" << " pos="<< iPosition<< std::endl;
             }
+            */
             // try to avoid overflow by incrementing func part
             for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
 
                 iIncrementFuncState = this->incrementElement_func(kmer, iPosition, key, reprobes, verbose);
 
+                /*
                 if (isCurTest)
                 {
                     std::cout << "cur test after overflow in func " << (int) iIncrementFuncState << " pos="<< iPosition<< std::endl;
                 }
+                 */
 
                 if (iIncrementFuncState == 0)
                 {
@@ -700,10 +715,12 @@ public:
 
 
         } else {
+            /*
             if (isCurTest)
             {
                 std::cout << "cur test no overflow in increment" << std::endl;
             }
+             */
         }
 
 
@@ -816,20 +833,24 @@ public:
         sTestStr = toSequence(kmer);
 
 
+        /*
         if (isCurTest)
         {
             std::cout << "overflow add before " << sTestStr << " " << kmer.to_string() << " " << this->getKmerCount(kmer).toUInt() << " in pos " << iPos << " with reprobe " << iReprobe << std::endl;
         }
+         */
 
         while (iPerformedReprobes < m_iMaxReprobes)
         {
 
             ++iPerformedReprobes;
 
+            /*
             if (isCurTest)
             {
                 std::cout << "overflow add before " << sTestStr << " " << this->getKmerCount(kmer).toUInt() << " in pos " << iPos << " with reprobe " << iReprobe << " perf reprobe " << iPerformedReprobes << std::endl;
             }
+             */
 
             // this fetches the element using the global reprobe!
             uint64_t iPos = this->getPosition(basekey, iReprobe + iPerformedReprobes);
@@ -845,10 +866,12 @@ public:
 
             TSX::tsx_key_t reprobePart = this->makeOverflowReprobe(iReprobe, iPerformedReprobes);
 
+            /*
             if (isCurTest)
             {
                 std::cout << "adding overflow kmer  " << sTestStr << " in " << iPos << " with reprobe " << iReprobe << " perf reprobe " << iPerformedReprobes << std::endl;
             }
+             */
 
             TSX::tsx_keyval_t savedkey = UBigInt(m_iKeyValBits, true, this->m_pPool);
             TSX::tsx_keyval_t* pSavedKey = &savedkey;
@@ -873,13 +896,11 @@ public:
 
             SBIGINT::SBIGINT *pKeyVal = m_pTMP_KEYVAL[iThreadID];
             SBIGINT::SBIGINT *pValue = m_pTMP_VALUE[iThreadID];
-            SBIGINT::SBIGINT *pOrigValue = m_pTMP_ORIGINAL[iThreadID];
-            SBIGINT::SBIGINT *pClear = m_pTMP_CLEAR[iThreadID];
             //this->performIncrement(&incRet);
             // increment element
 
             //(*pSavedKey).copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
-            SBIGINT::getFromMemory(pKeyVal, pOrigValue, iStartOffset, m_iKeyValBits, pPos);
+            SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
             for (uint8_t i = 0; i < pKeyVal->iFields; ++i) {
                 pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_value_key.m_pArray[i];
@@ -899,12 +920,14 @@ public:
 
                 m_setUsedPositions.insert(iPos);
 
+                /*
                 if (isCurTest)
                 {
                     std::cout << "overflow add empty after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " " << iPos << std::endl;
                     std::cout << "overflow add empty " << sTestStr  << " " << iPos << " " << oKeyVal.to_string() << std::endl;
                     std::cout << "overflow add empty initial reprobes " << iInitialReprobes << " reprobes " << iReprobe << " perf reprobes " << iPerformedReprobes << std::endl;
                 }
+                 */
 
                 //std::cout << "overflow add empty  after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " " << iPos << std::endl;
 

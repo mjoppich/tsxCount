@@ -748,11 +748,11 @@ public:
     uint8_t incrementElement_tsx(TSX::tsx_kmer_t& kmer, uint64_t iPosition, TSX::tsx_key_t& key, uint32_t reprobes, uint32_t iInitialReprobes, bool bKeyIsValue, bool verbose=false)
     {
 
-        std::string sTestStr = "TTCCATTCCATTCC";
-        UBigInt sTest = fromSequence(sTestStr, m_pPool);
+        //std::string sTestStr = "TTCCATTCCATTCC";
+        //UBigInt sTest = fromSequence(sTestStr, m_pPool);
 
-        bool isCurTest = kmer == sTest;
-        isCurTest = false;
+        //bool isCurTest = kmer == sTest;
+        bool isCurTest = false;
         bool handleFuncOverflow = false;
 
         //std::cout << "increment element tsx " << iPosition << std::endl;
@@ -826,7 +826,8 @@ public:
                 std::cout << "cur test overflow in increment" << " pos="<< iPosition<< std::endl;
             }
             // try to avoid overflow by incrementing func part
-            for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
+            //for (iFuncIncrementTries=0; iFuncIncrementTries < 10; ++iFuncIncrementTries) {
+            while(true) {
 
                 iIncrementFuncState = this->incrementElement_func(kmer, iPosition, key, reprobes, verbose);
 
@@ -1124,7 +1125,7 @@ public:
                     ++iAborts;
                 }
 
-                if (iTotalAborts % 10 == 0) {
+                if (iTotalAborts % 1000 == 0) {
                     std::cout << "aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                 }
 

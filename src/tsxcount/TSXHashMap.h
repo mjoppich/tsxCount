@@ -1397,7 +1397,6 @@ protected:
             std::string sKmerStr = toSequence(*kmer);
         }
 
-
         while (iPerformedReprobes < m_iMaxReprobes)
         {
 
