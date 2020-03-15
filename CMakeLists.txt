@@ -304,7 +304,7 @@ file(GLOB tsxCountPThreadPerf_H
         )
 
 file(GLOB tsxCountPThreadPerf_SRC
-        "src/mains/main_serialtsx.cpp"
+        "src/mains/main_pthreadperf.cpp"
         )
 ADD_EXECUTABLE(tsxCountPThreadPerf ${tsxCountPThreadPerf_SRC} ${tsxCountPThreadPerf_H})
 target_include_directories(tsxCountPThreadPerf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

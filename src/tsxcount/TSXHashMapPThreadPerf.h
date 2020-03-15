@@ -43,7 +43,7 @@ public:
 
     }
 
-    virtual void initialiseLocks() override
+    void initialiseLocks() override
     {
         TSXHashMapPerf::initialiseLocks();
 
@@ -81,7 +81,7 @@ public:
         return 0;
     }
 
-    bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos) override
     {
         uint8_t iPosLocked = this->position_locked(iArrayPos);
         return iPosLocked == 0 or iThreadID+1 == iPosLocked;
@@ -93,7 +93,7 @@ public:
      * @param iArrayPos array position for which the lock is acquired
      * @return True if lock successfully acquired, False otherwise
      */
-    virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos) override
     {
 
         pthread_mutex_lock(&m_oLockMutex);
@@ -116,7 +116,7 @@ public:
      *
      * @param iThreadID
      */
-    virtual void unlock_thread(uint8_t iThreadID)
+    void unlock_thread(uint8_t iThreadID) override
     {
         pthread_mutex_lock(&m_oLockMutex);
         m_pLocked[iThreadID].clear();
@@ -124,7 +124,7 @@ public:
 
     }
 
-    virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
+    bool releaseLock(uint8_t iThreadID, uint64_t iPos) override
     {
         pthread_mutex_lock(&m_oLockMutex);
         std::vector<uint64_t>::iterator oIt = std::find(m_pLocked[iThreadID].begin(), m_pLocked[iThreadID].end(), iPos);
@@ -147,21 +147,6 @@ public:
 
         return bRetVal;
     }
-
-
-
-    virtual ~TSXHashMapPThreadPerf()
-    {
-        free(m_pLocked);
-
-        free(m_pTMP_KEYVAL);
-        free(m_pTMP_VALUE);
-    }
-    size_t iAddCount = 0;
-    size_t iAddKmerCount = 0;
-    size_t iAborts = 0;
-    size_t iTotalAborts = 0;
-
 
 protected:
 

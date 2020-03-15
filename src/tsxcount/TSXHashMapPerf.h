@@ -53,7 +53,7 @@ public:
     size_t iTotalAborts = 0;
 
 
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false)
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false) override
     {
 
         bool bInserted = false;
@@ -906,11 +906,11 @@ public:
                  */
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
-                bool bMatchesKey = positionMatchesOverflowReprobe(iPos, basekey, iReprobe,
-                                                                  iPerformedReprobes); // was iReprobe+iPerformedReprobes
+                bool bMatchesKey = positionMatchesOverflowReprobe(iPos, basekey, iReprobe, iPerformedReprobes); // was iReprobe+iPerformedReprobes
 
                 if ((bIsKmerStart) || (!bMatchesKey)) {
                     //std::cout << "overflow Skipping position " << iPos << ": kmer=" << bIsKmerStart << " reprobes=" << iReprobe << " match=" << bMatchesKey << std::endl;
+                    this->releaseLock(iThreadID, iPos);
 
                     continue;
                 }

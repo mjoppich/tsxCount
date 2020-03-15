@@ -7,16 +7,20 @@
 #include <utils/CLParser.h>
 #include <fastxutils/FastXReader.h>
 #include <utils/SequenceUtils.h>
-#include <tsxcount/TSXHashMapOMPPerf.h>
+#include <tsxcount/TSXHashMapPThread.h>
+#include <tsxcount/TSXHashMapPThreadPerf.h>
 #include "testExecution.h"
+
 
 int main(int argc, char *argv[])
 {
 
     uint32_t itK = 14;
-    TSXHashMapOMPPerf* pTMap = new TSXHashMapOMPPerf(26, 4, itK, 4);
-    testHashMap(pTMap, true);
+    TSXHashMapPThreadPerf* ptMap = new TSXHashMapPThreadPerf(26, 4, itK, 4);
 
-    return 0;
+    testHashMap(ptMap, true);
+
+    return 1;
+
 
 }
