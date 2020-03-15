@@ -20,7 +20,7 @@
 #include <assert.h>
 
 
-inline void myStoreMem(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uint16_t iBitCount, uint8_t iFieldSize) {
+inline void myStoreMemSerialTSX(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uint16_t iBitCount, uint8_t iFieldSize) {
 
 
 
@@ -116,10 +116,6 @@ inline void myStoreMem(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitStart, uin
     }
 }
 
-
-
-
-FIELDTYPE volatile PREFETCH;
 
 
 class TSXHashMapSerialTSX : public TSXHashMap {
@@ -229,7 +225,7 @@ public:
 
             if (elemEmpty) {
                 //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
-                myStoreMem(pKeyReprobeShift->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE) * 8);
+                myStoreMemSerialTSX(pKeyReprobeShift->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE) * 8);
 
 
                 //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
