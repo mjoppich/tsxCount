@@ -126,7 +126,7 @@ class TSXHashMapSerialTSX : public TSXHashMap {
 
 public:
 
-    TSXHashMapSerialTSX(uint8_t iL, uint32_t iStorageBits, uint16_t iK, uint8_t iThreads=2)
+    TSXHashMapSerialTSX(uint8_t iL, uint32_t iStorageBits, uint16_t iK, uint8_t iThreads=1)
             : TSXHashMap(iL, iStorageBits, iK)
     {
         this->setThreads(iThreads);

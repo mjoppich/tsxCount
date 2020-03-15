@@ -20,6 +20,7 @@
 #include <tsxcount/TSXHashMapCAS.h>
 #include <tsxcount/TSXHashMapOMPPerf.h>
 #include <tsxcount/TSXHashMapPerf.h>
+#include <tsxcount/TSXHashMapSerialTSX.h>
 
 const char *argp_program_version = "tsxCount 1.0";
 const char *argp_program_bug_address = "joppich@bio.ifi.lmu.de";
@@ -35,8 +36,8 @@ static struct argp_option options[] = {
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
 };
-enum tsx_mode{ SERIAL, PTHREAD, OMP, CAS, TRANSACTIONAL, TSXPERF, OMPPERF, SERIALPERF };
-const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TSX", "TSXPERF", "OMPPERF", "SERIALPERF" };
+enum tsx_mode{ SERIAL, SPERF, PTHREAD, OMP, CAS, TRANSACTIONAL, TSXPERF, OMPPERF, SERIALPERF };
+const char * TSXModeStrings[] = { "SERIAL", "SPERF", "PTHREAD", "OMP", "CAS", "TSX", "TSXPERF", "OMPPERF", "SERIALPERF" };
 
 struct arguments {
     uint16_t k,l,storagebits;
@@ -54,10 +55,13 @@ tsx_mode strToMode(char* pArg)
     if (argStr == "SERIAL")
     {
         return tsx_mode::SERIAL;
+    } else if (argStr == "SPERF")
+    {
+        return tsx_mode::SPERF;
     } else if (argStr == "SERIALPERF")
     {
         return tsx_mode::SERIALPERF;
-    } else if (argStr == "PTHREAD")
+    }else if (argStr == "PTHREAD")
     {
         return tsx_mode::PTHREAD;
     } else if (argStr == "OMP")
@@ -257,6 +261,16 @@ int main(int argc, char *argv[])
             if (arguments.threads != 1)
             {
                 std::cerr << "Requesting to run SERIAL with Threads != 1 => EXIT(0)" << std::endl;
+                return 0;
+            }
+            break;
+        case SPERF:
+            std::cerr << "Creating TSXHashMap TSX SERIAL" << std::endl;
+            pMap = new TSXHashMapSerialTSX(arguments.l, arguments.storagebits, arguments.k, 1);
+
+            if (arguments.threads != 1)
+            {
+                std::cerr << "Requesting to run TSX SERIAL with Threads != 1 => EXIT(0)" << std::endl;
                 return 0;
             }
             break;
