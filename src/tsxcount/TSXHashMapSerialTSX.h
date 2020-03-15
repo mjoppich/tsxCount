@@ -118,6 +118,10 @@ inline void myStoreMemSerialTSX(FIELDTYPE* pSrc, FIELDTYPE* pDest,uint32_t iBitS
 
 
 
+
+FIELDTYPE volatile STSXPREFETCH;
+
+
 class TSXHashMapSerialTSX : public TSXHashMap {
 
 public:
@@ -532,7 +536,7 @@ public:
             TSX::tsx_keyval_t* pSavedKey = &savedkey;
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
-            PREFETCH = pPos[0];
+            STSXPREFETCH = pPos[0];
             asm volatile("":: :"memory");
 
             SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
@@ -925,7 +929,7 @@ public:
 
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
-            PREFETCH = pPos[0];
+            STSXPREFETCH = pPos[0];
             asm volatile("":: :"memory");
 
 
