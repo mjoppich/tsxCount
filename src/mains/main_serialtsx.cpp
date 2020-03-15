@@ -10,7 +10,7 @@
 #include "testExecution.h"
 #include <stddef.h>
 #include <immintrin.h>
-#include <tsxcount/TSXHashMapTSXPerf.h>
+#include <tsxcount/TSXHashMapSerialTSX.h>
 
 
 int main(int argc, char *argv[])
@@ -18,9 +18,9 @@ int main(int argc, char *argv[])
 
 
     uint32_t itK = 14;
-    uint32_t iThreads = 4;
+    uint32_t iThreads = 1;
 
-    TSXHashMapTSXPerf* ptMap = new TSXHashMapTSXPerf(26, 4, itK, iThreads);
+    TSXHashMapSerialTSX* ptMap = new TSXHashMapSerialTSX(26, 4, itK, iThreads);
 
 
     UBigInt testkmer = UBigInt::fromString("1010010110000010111000001110", ptMap->getMemoryPool());
