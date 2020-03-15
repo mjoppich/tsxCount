@@ -7,15 +7,15 @@
 
 
 #include "TSXHashMap.h"
+#include "commons.h"
 #include <pthread.h>
 #include <stack>
+
 
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include <unistd.h>
 #include <cmath>
-
-
 #include <src/tsxutils/SBigInt.h>
 
 

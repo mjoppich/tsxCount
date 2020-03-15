@@ -132,7 +132,7 @@ public:
 
     void eraseIt(std::vector<MemLoc>::iterator& oit)
     {
-        long d = std::distance(m_vHeap.begin(), oit);
+        //long d = std::distance(m_vHeap.begin(), oit);
         m_vHeap.erase(oit);
     }
 

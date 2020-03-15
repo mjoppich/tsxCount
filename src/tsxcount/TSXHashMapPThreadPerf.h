@@ -1,9 +1,10 @@
 //
-// Created by mjopp on 05/03/2020.
+// Created by mjopp on 15/03/2020.
 //
 
-#ifndef TSXCOUNT_TSXHASHMAPOMPPERF_H
-#define TSXCOUNT_TSXHASHMAPOMPPERF_H
+#ifndef TSXCOUNT_TSXHASHMAPPTHREADPERF_H
+#define TSXCOUNT_TSXHASHMAPPTHREADPERF_H
+
 #include "TSXHashMap.h"
 #include "TSXHashMapOMP.h"
 #include "TSXHashMapPerf.h"
@@ -30,11 +31,11 @@
 
 
 
-class TSXHashMapOMPPerf : public TSXHashMapPerf {
+class TSXHashMapPThreadPerf : public TSXHashMapPerf {
 
 public:
 
-    TSXHashMapOMPPerf(uint8_t iL, uint32_t iStorageBits, uint16_t iK, uint8_t iThreads=2)
+    TSXHashMapPThreadPerf(uint8_t iL, uint32_t iStorageBits, uint16_t iK, uint8_t iThreads=2)
             : TSXHashMapPerf(iL, iStorageBits, iK)
     {
 
@@ -42,7 +43,7 @@ public:
 
     }
 
-    void initialiseLocks() override
+    virtual void initialiseLocks() override
     {
         TSXHashMapPerf::initialiseLocks();
 
@@ -53,11 +54,37 @@ public:
             m_pLocked[i] = std::vector<uint64_t>();
         }
 
+        pthread_mutex_init(&m_oLockMutex, NULL);
 
-        omp_lock_hint_t lockHint = omp_lock_hint_speculative;
-        omp_init_lock_with_hint(&m_oOMPLock, lockHint );
-        //omp_init_lock(&m_oOMPLock);
+    }
 
+
+    /**
+     *
+     * @param iArrayPos checks whether iArrayPos is locked
+     * @return threadID of thread who locks iArrayPos or -1
+     */
+    uint8_t position_locked(uint64_t iArrayPos)
+    {
+
+        for (uint8_t i = 0; i < m_iThreads; ++i)
+        {
+
+            std::vector<uint64_t>::iterator iPos = std::find(m_pLocked[i].begin(), m_pLocked[i].end(), iArrayPos);
+
+            if (iPos != m_pLocked[i].end())
+            {
+                return i+1;
+            }
+        }
+
+        return 0;
+    }
+
+    bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
+    {
+        uint8_t iPosLocked = this->position_locked(iArrayPos);
+        return iPosLocked == 0 or iThreadID+1 == iPosLocked;
     }
 
     /**
@@ -69,19 +96,15 @@ public:
     virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
 
-        omp_set_lock(&m_oOMPLock);
+        pthread_mutex_lock(&m_oLockMutex);
         bool success = false;
 
         if (this->canAcquireLock(iThreadID, iArrayPos)) {
-
-            //std::cerr << "Locked Pos " << iArrayPos << " for thread " << (int) iThreadID << std::endl;
-
-
             m_pLocked[iThreadID].insert(m_pLocked[iThreadID].end(), iArrayPos);
             success = true;
         }
 
-        omp_unset_lock(&m_oOMPLock);
+        pthread_mutex_unlock(&m_oLockMutex);
         return success;
 
     }
@@ -95,15 +118,15 @@ public:
      */
     virtual void unlock_thread(uint8_t iThreadID)
     {
-        omp_set_lock(&m_oOMPLock);
+        pthread_mutex_lock(&m_oLockMutex);
         m_pLocked[iThreadID].clear();
-        omp_unset_lock(&m_oOMPLock);
+        pthread_mutex_unlock(&m_oLockMutex);
 
     }
 
     virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
     {
-        omp_set_lock(&m_oOMPLock);
+        pthread_mutex_lock(&m_oLockMutex);
         std::vector<uint64_t>::iterator oIt = std::find(m_pLocked[iThreadID].begin(), m_pLocked[iThreadID].end(), iPos);
 
         bool bRetVal = false;
@@ -115,16 +138,21 @@ public:
             m_pLocked[iThreadID].erase(oIt);
         }
 
-        omp_unset_lock(&m_oOMPLock);
+        pthread_mutex_unlock(&m_oLockMutex);
+
+        if (bRetVal == false)
+        {
+            std::cerr << "error releasing lock" << std::endl;
+        }
 
         return bRetVal;
     }
 
 
-    virtual ~TSXHashMapOMPPerf()
+
+    virtual ~TSXHashMapPThreadPerf()
     {
         free(m_pLocked);
-
 
         free(m_pTMP_KEYVAL);
         free(m_pTMP_VALUE);
@@ -141,4 +169,5 @@ protected:
 };
 
 
-#endif //TSXCOUNT_TSXHASHMAPOMPPERF_H
+
+#endif //TSXCOUNT_TSXHASHMAPPTHREADPERF_H

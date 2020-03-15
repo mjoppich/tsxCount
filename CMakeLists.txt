@@ -298,5 +298,21 @@ target_compile_options(tsxCountSERIALTSX PUBLIC -Wall ${OpenMP_CXX_FLAGS}  -mrtm
 TARGET_LINK_LIBRARIES(tsxCountSERIALTSX PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
 install(TARGETS tsxCountSERIALTSX DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
+# Main PThread Perf
+file(GLOB tsxCountPThreadPerf_H
+        "src/mains/testExecution.h"
+        )
+
+file(GLOB tsxCountPThreadPerf_SRC
+        "src/mains/main_serialtsx.cpp"
+        )
+ADD_EXECUTABLE(tsxCountPThreadPerf ${tsxCountPThreadPerf_SRC} ${tsxCountPThreadPerf_H})
+target_include_directories(tsxCountPThreadPerf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_compile_options(tsxCountPThreadPerf PUBLIC -Wall ${OpenMP_CXX_FLAGS}  -mrtm -mprfchw ${OpenMP_CXX_FLAGS})
+
+TARGET_LINK_LIBRARIES(tsxCountPThreadPerf PUBLIC ${OpenMP_CXX_FLAGS} tsxcounter tsxutils ${CMAKE_OPENMP_LIBRARY_NAME} Threads::Threads )
+install(TARGETS tsxCountPThreadPerf DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
 
 MESSAGE("")

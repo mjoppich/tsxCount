@@ -1421,7 +1421,7 @@ protected:
             throw new UBigIntNotLargeEnough(this, iLength);
         */
 
-        const uint8_t iFields = std::ceil( iLength / m_iFieldSize );
+        //const uint8_t iFields = std::ceil( iLength / m_iFieldSize );
         const div_t fields = div(iLength, m_iFieldSize);
 
         uint8_t i = 0;
@@ -1532,12 +1532,12 @@ protected:
 
 
 
-    void copy_content_to_array_old(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
+    /*void copy_content_to_array_old(FIELDTYPE* pSrc, uint32_t iBitStart, uint32_t iBitCount)
     {
 
         uint8_t iOffset = iBitStart % m_iFieldSize;
         uint32_t iStartField = iBitStart / m_iFieldSize;
-        uint32_t iBitsRead = 0;
+        //uint32_t iBitsRead = 0;
         uint32_t iMaxField = (iBitStart + iBitCount) / m_iFieldSize;
 
 
@@ -1608,7 +1608,7 @@ protected:
 
         }
 
-    }
+    }*/
 
 
 

@@ -79,7 +79,7 @@ class BijectiveKMapping : public IBijectiveFunction {
 public:
 
     BijectiveKMapping(uint32_t iK, MemoryPool<FIELDTYPE>* pPool)
-    : m_pPool(pPool), m_iK(iK), m_matN(2*iK)
+    :m_iK(iK), m_matN(2*iK), m_pPool(pPool)
     {
         srand(time(NULL));
 
@@ -172,9 +172,9 @@ public:
     {
         std::stringstream oSS;
 
-        for (int i=0; i<m_matN; i++)
+        for (uint32_t i=0; i<m_matN; i++)
         {
-            for (int j=0; j<m_matN; j++)
+            for (uint32_t j=0; j<m_matN; j++)
                 oSS << std::to_string(A[pos(i,j)]) << " ";
             oSS << std::endl;
         }
@@ -517,8 +517,8 @@ protected:
     void lubksb(int8_t* mat, size_t n, int8_t* pivot, int8_t* vec)
     {
 
-        size_t ii, ip;
-        ii = 0;
+        size_t ip;
+        //ii = 0;
         ip = 0;
 
         int8_t sum = 0;
@@ -665,7 +665,7 @@ protected:
             memcpy(LU, pMat, m_matN*m_matN*sizeof(int8_t));
 
             isDecomposed = decomposeMatrixRecipe(LU, pivot, m_matN);
-            int8_t d = 0;
+            //int8_t d = 0;
 
             if (isDecomposed)
             {

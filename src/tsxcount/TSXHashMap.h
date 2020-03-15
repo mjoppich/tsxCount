@@ -319,7 +319,7 @@ public:
 
         if (!bInserted)
         {
-           uint32_t maxPositions = 1 << m_iL;
+            uint32_t maxPositions = 1 << m_iL;
 
             std::cerr << "Could not insert kmer " << kmer.to_string()<< std::endl;
             std::cerr << "Used fields: " << m_setUsedPositions.size() << std::endl;
@@ -550,7 +550,7 @@ public:
 
             uint8_t iKmerStarts = m_iKmerStarts.getBit(i);
 
-            bool isStart = m_setUsedPositions.find(i) != m_setUsedPositions.end();
+            //bool isStart = m_setUsedPositions.find(i) != m_setUsedPositions.end();
 
             if (!iKmerStarts)
                 continue;
@@ -668,7 +668,6 @@ protected:
     {
 
         UBigInt oRet(seq.length()*2, false, pPool);
-        bool hadN = false;
 
         for (size_t i = 0; i < seq.length(); ++i)
         {
@@ -711,8 +710,6 @@ protected:
 
                     oRet.setBit(iBitPos, iBit1);
                     oRet.setBit(iBitPos+1, iBit2);
-
-                    hadN = true;
 
                     break;
             }
@@ -1084,7 +1081,7 @@ protected:
         TSX::tsx_keyval_t oKeyVal(key, 2*m_iK + m_iStorageBits);
         oKeyVal = (oKeyVal << m_iStorageBits) | val;
 
-        uint8_t iArray = 0;//pos % 4;
+        //uint8_t iArray = 0;//pos % 4;
         //pos = pos >> 4;
 
         // we want to get the iPosition-th entry
@@ -1530,8 +1527,8 @@ protected:
     const uint8_t m_iL;
     const uint32_t m_iLength;
     const uint32_t m_iStorageBits;
-    const uint32_t m_iK;
     const uint32_t m_iKeyValBits;
+    const uint32_t m_iK;
     const uint32_t m_iMaxReprobes;
 
     const UBigInt m_iMapSize;
