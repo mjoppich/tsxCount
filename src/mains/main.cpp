@@ -128,6 +128,8 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
                 std::vector<FASTQEntry>* pEntries = pReader->getEntries(40);
                 uint64_t iPosOfInterest = 0;
 
+		//std::cout << "master " << omp_get_thread_num() << std::endl;
+
 #pragma omp task firstprivate(pEntries) shared(iPosOfInterest)
                 {
 
