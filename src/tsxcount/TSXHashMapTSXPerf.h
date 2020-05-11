@@ -209,7 +209,7 @@ public:
                 prefVal = pKeyVal->pdata[i];
                 prefVal = pKeyReprobeShift->pdata[i];
             }
-            prefVal = pPos[pKeyVal->iFields];
+	    //prefVal = pPos[pKeyVal->iFields];
             __atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
             
 

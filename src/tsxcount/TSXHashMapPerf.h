@@ -96,15 +96,15 @@ public:
 
             uint8_t i = 0;
 
-            volatile FIELDTYPE prefVal;
-            for (i = 0; i < pKeyVal->iFields; ++i) {
-                //__atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
-                __atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
-                prefVal = pKeyVal->pdata[i];
-                prefVal = pKeyReprobeShift->pdata[i];
-            }
-            prefVal = pPos[pKeyVal->iFields];
-            __atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
+            //volatile FIELDTYPE prefVal;
+            //for (i = 0; i < pKeyVal->iFields; ++i) {
+            //    __atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
+            //    __atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
+            //    prefVal = pKeyVal->pdata[i];
+            //    prefVal = pKeyReprobeShift->pdata[i];
+            //}
+            //prefVal = pPos[pKeyVal->iFields];
+            //__atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
 
 
             uint16_t iKeyValBits = m_iKeyValBits;
@@ -842,7 +842,7 @@ public:
 
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
-            TSXHASHMAPPREFETCH = pPos[0];
+            //TSXHASHMAPPREFETCH = pPos[0];
             asm volatile("":: :"memory");
 
             //this->performIncrement(&incRet);
