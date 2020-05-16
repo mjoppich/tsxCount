@@ -39,6 +39,8 @@ if __name__ == '__main__':
     samples = args.samples
     methods = args.methods
 
+    print("OMP_PROC_BIND","=", os.environ.get("OMP_PROC_BIND", "N/A"))
+
     #threads = [1,2,4]
     #methods = ["OMPPERF", "OMP", "TSX", "CAS", "SERIAL", "SERIALPERF"]
 
