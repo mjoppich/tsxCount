@@ -246,11 +246,13 @@ public:
 
                 //std::cout << "after add and transaction" << std::endl;
 
-
+#pragma omp critical
+{
                 // so we can find kmer start positions later without knowing the kmer
                 m_iKmerStarts.setBit(iPos, 1);
                 // TODO this slows down inserting, but is a nice measure ifdef out verbose?
                 m_setUsedPositions.insert(iPos);
+}
 
                 this->iAddCount += 1;
                 bInserted = true;
@@ -1056,7 +1058,10 @@ public:
                 _xend();
                 asm volatile("":::"memory");
 
+		#pragma omp critical
+		{
                 m_setUsedPositions.insert(iPos);
+		}
 
                 if (isCurTest)
                 {
