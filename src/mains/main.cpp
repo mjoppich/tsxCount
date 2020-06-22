@@ -95,9 +95,8 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
     const size_t iMaxCount = 2048*4*16;
 
     uint8_t threads = pMap->getThreads();
-    omp_set_num_threads(pMap->getThreads());
-
-    std::cout << "Running on " << (int) omp_get_max_threads() << " threads" << std::endl;
+    std::cout << "Threads should be set to " << (int) threads << std::endl;
+    //std::cout << "Running on " << (int) omp_get_max_threads() << " threads (set to " <<  << ")" << std::endl;
     omp_set_dynamic(0);
 
     /*
@@ -114,11 +113,14 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
 
     uint32_t iK = pMap->getK();
 
+omp_set_num_threads(pMap->getThreads());
 
-#pragma omp parallel num_threads(threads)
+#pragma omp parallel
     {
-#pragma omp master
-        {
+#pragma omp single
+	{
+	    std::cout << "Running on " << (int) omp_get_max_threads() << " threads (set to " << omp_get_num_threads() << ")" << std::endl;
+
             bool exitNow = false;
             bool verbose = false;
 
@@ -133,9 +135,11 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
 #pragma omp task firstprivate(pEntries) shared(iPosOfInterest)
                 {
 
+                   uint8_t taskThreads = omp_get_num_threads();
+
 #pragma omp critical
                     {
-                        std::cout << "In thread " << omp_get_thread_num() << " reading entries " << pEntries->size() << std::endl;
+                        std::cout << "In thread " << omp_get_thread_num() << " of " << (int) taskThreads << " reading entries " << pEntries->size() << std::endl;
                     }
 
                     MemoryPool<FIELDTYPE>* pPool = pMap->getMemoryPool();
