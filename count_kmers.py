@@ -1,12 +1,13 @@
 from Bio import SeqIO
 from collections import Counter
+import sys
 
 kmerCounts = Counter()
 
-k=14
+k=int(sys.argv[2])
 seenSeqs = 0
 
-with open('/mnt/d/owncloud/data/tsx/usmall_t7.fastq', 'r') as fin:
+with open(sys.argv[1], 'r') as fin:
 
     for record in SeqIO.parse(fin, "fastq"):
         
@@ -28,5 +29,6 @@ with open('/mnt/d/owncloud/data/tsx/usmall_t7.fastq', 'r') as fin:
             kmerCounts[kseq] += 1
 
 
-for kmer in kmerCounts:
-    print(kmer, kmerCounts[kmer], sep="\t")
+with open(sys.argv[1] + "." + str(k) + ".count", 'w') as fout:
+	for kmer in kmerCounts:
+		print(kmer, kmerCounts[kmer], sep="\t", file=fout)
