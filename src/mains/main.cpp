@@ -89,12 +89,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 static struct argp argp = { options, parse_opt, args_doc, doc, 0, 0, 0 };
 
 
-void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
+void countKMers(TSXHashMap* pMap, struct arguments* pARGP, uint8_t threads)
 {
 
     const size_t iMaxCount = 2048*4*16;
 
-    uint8_t threads = pMap->getThreads();
+//    uint8_t threads = pMap->getThreads();
     std::cout << "Threads should be set to " << (int) threads << std::endl;
     //std::cout << "Running on " << (int) omp_get_max_threads() << " threads (set to " <<  << ")" << std::endl;
     omp_set_dynamic(0);
@@ -113,7 +113,8 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP)
 
     uint32_t iK = pMap->getK();
 
-omp_set_num_threads(pMap->getThreads());
+//omp_set_num_threads(pMap->getThreads());
+omp_set_num_threads(threads);
 
 #pragma omp parallel
     {
@@ -191,22 +192,33 @@ omp_set_num_threads(pMap->getThreads());
         std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
         std::cout << "Manual counts: " << kmer2c.size() << std::endl;
 
+	uint64_t totalerrors = 0;
+	std::map<std::string, uint32_t>::iterator it;
 
 #pragma omp parallel
-        {
+	{
 #pragma omp single
-            {
-                for (auto& elem: kmer2c)
-                {
-#pragma omp task
-                    {
-                        // Do something with x, e.g.
-                        UBigInt tkmer = TSXSeqUtils::fromSequenceD(elem.first, pMap->getMemoryPool());
-                        evaluate(pMap, tkmer, elem.second, &(elem.first));
-                    }
-                }
-            }
+		{
+	for (it = std::begin(kmer2c); it != std::end(kmer2c); ++it)
+        {
+//#pragma omp task
+		{
+
+            // Do something with x, e.g.
+            UBigInt tkmer = TSXSeqUtils::fromSequenceD(it->first, pMap->getMemoryPool());
+            uint8_t errorCount = evaluate(pMap, tkmer, it->second, &(it->first), false);
+
+	    if (errorCount)
+	    {
+	        #pragma omp critical
+	        totalerrors += errorCount;
+	    }
+		}
         }
+		}
+	}
+
+	std::cout << "total errors" << (int) totalerrors << std::endl;
     }
 
 
@@ -246,12 +258,13 @@ int main(int argc, char *argv[])
     {
         case SERIAL:
             std::cerr << "Creating TSXHashMap SERIAL" << std::endl;
-            pMap = new TSXHashMapPerf(arguments.l, arguments.storagebits, arguments.k);
+            pMap = new TSXHashMapPerf(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
 
             if (arguments.threads != 1)
             {
                 std::cerr << "Requesting to run SERIAL with Threads != 1 => EXIT(0)" << std::endl;
-                return 0;
+		std::cerr << "CONTINUEING AT OWN RISK!" << std::endl;
+                //return 0;
             }
             break;
 
@@ -282,7 +295,7 @@ int main(int argc, char *argv[])
             break;
     }
 
-    countKMers(pMap, &arguments);
+    countKMers(pMap, &arguments, arguments.threads);
 
     pMap->print_stats();
 

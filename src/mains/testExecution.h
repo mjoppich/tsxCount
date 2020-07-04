@@ -35,7 +35,7 @@ std::vector<std::string> createKMers(std::string& sSequence, size_t iK, MemoryPo
 
 }
 
-void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std::string* pKmer=NULL)
+uint8_t evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std::string* pKmer=NULL, bool print=false)
 {
 
     UBigInt oRes1 = pMap->getKmerCount(kmer);
@@ -49,23 +49,29 @@ void evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std
 
     if (iRefCount != iKmer1Count)
     {
+	    std::cout << "error " << (int)iRefCount << " " << (int)iKmer1Count << std::endl;
 #pragma omp critical
         {
+	    if (print)
+	    {
             std::cout << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;
 
-
             UBigInt oRes2 = pMap->getKmerCount(kmer, true);
-            if (pKmer != NULL)
+            
+	    if (pKmer != NULL)
             {
                 std::cout << " " << *pKmer;
             }
 
             std::cout <<  std::endl;
+	    }
         };
+
+	return 1;
 
     }
 
-
+    return 0;
 
 }
 

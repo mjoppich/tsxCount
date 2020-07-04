@@ -33,10 +33,10 @@ class TSXHashMapPerf : public TSXHashMap {
 
 public:
 
-    TSXHashMapPerf(uint8_t iL, uint32_t iStorageBits, uint16_t iK)
+    TSXHashMapPerf(uint8_t iL, uint32_t iStorageBits, uint16_t iK, uint8_t iThreads=1)
             : TSXHashMap(iL, iStorageBits, iK) {
 
-        this->setThreads(1);
+        this->setThreads(iThreads);
 
     }
 
