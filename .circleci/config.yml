@@ -3,13 +3,12 @@ version: 2.1
 jobs:
   build:
     docker:
-      image: 'cimg/base:2020.01'
-    resource_class: small
+      - image: cimg/base:2020.01
     steps:
       - checkout
-      - run:
-          name: "Install Deps"
-          command: sudo apt-get update && sudo apt-get install libomp-dev clang
+      # Whatever you want to do
+      - run: sudo apt-get update && sudo apt-get install -y cowsay libomp-dev clang
+      - run: cowsay "Continuous Integration Rocks!"
       - run:
           name: "Setup Project"
           command: mkdir build && cd build && CXX=clang++ cmake ..
