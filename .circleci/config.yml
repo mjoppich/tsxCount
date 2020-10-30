@@ -24,4 +24,4 @@ jobs:
           command: cd build && make
       - run:
           name: "Test Project"
-          command: ./build/tsxCount --input=./data/small_t7.1000.fastq --mode=SERIAL --check
+          command: ./build/tsxCount --input=./data/small_t7.1000.fastq --mode=SERIAL --threads=1 --check
