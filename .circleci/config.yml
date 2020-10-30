@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   build:
     docker:
-      image: "_/ubuntu:20.04"
+      image: ubuntu:focal
     resource_class: small
     steps:
       - checkout
