@@ -1,4 +1,5 @@
 # tsxCount
+[![Build Status](https://travis-ci.org/mjoppich/tsxCount.svg?branch=master)](https://travis-ci.org/mjoppich/tsxCount)
 
 ## Introduction
 
