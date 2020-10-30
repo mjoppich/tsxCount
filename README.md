@@ -1,6 +1,9 @@
 # tsxCount
 [![Build Status](https://travis-ci.com/mjoppich/tsxCount.svg?branch=master)](https://travis-ci.com/mjoppich/tsxCount)
 [![Build Status](https://circleci.com/gh/mjoppich/tsxCount.svg?style=svg)](https://circleci.com/gh/mjoppich/tsxCount)
+[![DOI](https://zenodo.org/badge/80602501.svg)](https://zenodo.org/badge/latestdoi/80602501)
+
+
 
 ## Introduction
 
