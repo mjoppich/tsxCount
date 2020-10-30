@@ -36,7 +36,7 @@ tsxCount is not meant to be a new k-mer counter. Instead, tsxCount is meant to c
 
 ## Installation
 
-tsxCount is cmake enabled. Hence, given that all dependencies are available (compiler, libgomp), the tsxCount build process should look similar to:
+tsxCount is cmake enabled. Hence, given that all dependencies are available (`libomp-dev clang-10 cmake zlib1g-dev`), the tsxCount build process should look similar to:
 
 ```
 git clone https://github.com/mjoppich/tsxCount.git
