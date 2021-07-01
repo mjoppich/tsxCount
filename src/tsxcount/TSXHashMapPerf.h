@@ -53,7 +53,7 @@ public:
     size_t iTotalAborts = 0;
 
 
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false) override
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false, bool noPrimaryAddition=false) override
     {
 
         bool bInserted = false;
@@ -76,6 +76,11 @@ public:
                 continue;
             }
 
+            if (verbose)
+            {
+                std::cout << "ADDKMER "<< kmer.to_string() <<" into position" << iPos << " with reprobes " << iReprobes <<std::endl;
+            }
+
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
             key_reprobe_shift.resize(m_iKeyValBits);
             key_reprobe_shift.shiftLeft(m_iStorageBits);// (key_reprobe_shift << m_iStorageBits);,
@@ -96,33 +101,22 @@ public:
 
             uint8_t i = 0;
 
-            //volatile FIELDTYPE prefVal;
-            //for (i = 0; i < pKeyVal->iFields; ++i) {
-            //    __atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
-            //    __atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
-            //    prefVal = pKeyVal->pdata[i];
-            //    prefVal = pKeyReprobeShift->pdata[i];
-            //}
-            //prefVal = pPos[pKeyVal->iFields];
-            //__atomic_store(pPos + i, pPos + i, __ATOMIC_RELAXED);
-
-
             uint16_t iKeyValBits = m_iKeyValBits;
-            asm volatile("":: :"memory");
-
 
             // increment element
             SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
             bool elemEmpty = SBIGINT::isZero(pKeyVal, m_iKeyValBits);
 
+            if (verbose)
+            {
+                std::cout << "ADDKMER elem empty " << elemEmpty << std::endl;
+            }
+
 
             if (elemEmpty) {
                 //SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
                 SBIGINT::storeInMemory(pKeyReprobeShift->pdata, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE) * 8);
-
-                // transaction completes here
-                asm volatile("":: :"memory");
 
                 //std::cout << "after add and transaction" << std::endl;
 
@@ -133,7 +127,8 @@ public:
 
                 this->releaseLock(iThreadID, iPos);
                 bInserted = true;
-                break;
+                
+                return true;
 
             } else {
 
@@ -143,8 +138,6 @@ public:
                 // TODO where is the case kmer starts multiple positions later handled?
                 bool bIsKmerStart = m_iKmerStarts.getBit(iPos) == 1;
                 bool bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
-
-
 
                 if ((bIsKmerStart) && (bMatchesKey))
                 {
@@ -177,58 +170,17 @@ public:
                          */
                     }
 
-                    bInserted = true;
-
-                    break;
-
-                    /*
-                    CIncrementElement incRet = this->incrementElement(iPos, basekey, iReprobes, 1, false);
-                    std::vector<CIncrementElement> vOPS;
-                    vOPS.insert(vOPS.end(), incRet);
-
-                    if (incRet.iOverflow == 1)
-                    {
-                        uint8_t iOvflw = this->handleOverflow(iPos, basekey, iReprobes, &vOPS, &kmer);
-
-                        if (iOvflw == 2)
-                        {
-                            // TRY AGAIN
-                            continue;
-                        }
-
-                        //this->performIncrement(&incRet);
-                    }
-
-                    std::vector<size_t> usedPos;
-                    for (auto rit = vOPS.rbegin(); rit != vOPS.rend(); ++rit)
-                    {
-                        CIncrementElement inc = (*rit);
-
-                        //std::cout << inc.iPosition;
-                        //inc.keyval.print_string();
-                        this->performIncrement(&inc);
-                        this->releaseLock(iThreadID, inc.iPosition);
-
-                    }
-                     */
-
-                    //this->releaseLock(iThreadID, iPos);
-
+                    return true;
 
                 } else {
 
                     //bool bMatchesKey2 = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
                     ++iReprobes;
-
                     this->releaseLock(iThreadID, iPos);
 
                     continue;
                 }
-
-
             }
-
-
         }
 
         if (!bInserted)
@@ -277,97 +229,62 @@ public:
 
         uint8_t iThreadID = omp_get_thread_num();
 
+        uint64_t iBitsToPos = (iPosition) * m_iKeyValBits;
+        uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE) * 8);
+        uint32_t iStartOffset = iBitsToPos - ((sizeof(FIELDTYPE) * 8) * iStartPos);
+        FIELDTYPE *pPos = m_pCounterArray + iStartPos;
 
-        //std::cout << "in inc key value" << std::endl;
+        // THIS PREFETCH is necessary to avoid stupid status==0...
+        TSX::tsx_val_t value = UBigInt(m_iStorageBits, true, this->m_pPool);
 
-        for (uint8_t iTSXRetries=0; iTSXRetries < 10; ++iTSXRetries) {
+        SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
+        SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
+        uint8_t i;
+        bool elemEmpty = false;
 
-
-            uint64_t iBitsToPos = (iPosition) * m_iKeyValBits;
-            uint32_t iStartPos = iBitsToPos / (sizeof(FIELDTYPE) * 8);
-            uint32_t iStartOffset = iBitsToPos - ((sizeof(FIELDTYPE) * 8) * iStartPos);
-            FIELDTYPE *pPos = m_pCounterArray + iStartPos;
-
-            // THIS PREFETCH is necessary to avoid stupid status==0...
-            TSX::tsx_val_t value = UBigInt(m_iStorageBits, true, this->m_pPool);
-
-            SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
-            SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
-            uint8_t i;
-            bool elemEmpty = false;
-
-            asm volatile("":: :"memory");
+        SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
 
+        for (i = 0; i < pKeyVal->iFields; ++i)
+        {
+            pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_value_key.m_pArray[i];
+            pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
+        }
 
-            //this->performIncrement(&incRet);
-            // increment element
+        bitComplement(pValue);
+        elemEmpty = isZero(pValue, m_iStorageBits);
 
-            //(*pSavedKey).copy_content_bits(pPos, iStartOffset, m_iKeyValBits);
-            SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
-            //value = (*pSavedKey) &  m_mask_value_key;
+        if (elemEmpty) {
 
             for (i = 0; i < pKeyVal->iFields; ++i)
             {
-                pValue->pdata[i] = pKeyVal->pdata[i] & m_mask_value_key.m_pArray[i];
-                pKeyVal->pdata[i] = pKeyVal->pdata[i] & m_mask_key_value.m_pArray[i];
+                pValue->pdata[i] = 0;
             }
 
+        } else {
             bitComplement(pValue);
-            elemEmpty = isZero(pValue, m_iStorageBits);
 
+            add_simpleSBIGINT(pValue);
 
-            // check whether overflow occurs, or not
-            // elemEmpty == true => OVERFLOW OCCURS!
-            //elemEmpty = false;//(~value).isZero();
-
-            if (elemEmpty) {
-
-                for (i = 0; i < pKeyVal->iFields; ++i)
-                {
-                    pValue->pdata[i] = 0;
-                }
-
-            } else {
-                bitComplement(pValue);
-
-                add_simpleSBIGINT(pValue);
-
-                for (i = 0; i < pKeyVal->iFields; ++i)
-                {
-                    // keeps key (func+reprobe), nulls value
-                    pKeyVal->pdata[i] = pKeyVal->pdata[i] | pValue->pdata[i];
-                }
-            }
-
-            //pSavedKey->bitAnd(m_mask_key_value);
-            //pSavedKey->bitOr(value);
-
-            //oStartPos = udiv( (uint32_t) pINC->iPosition*m_iKeyValBits, sizeof(uint8_t) * 8);
-            //(*pSavedKey).copy_content_to_array(pPos, iStartOffset, m_iKeyValBits);
-            SBIGINT::storeInMemory(pKeyVal->pdata, pPos, iStartOffset, m_iKeyValBits, pKeyVal->iFieldSize);
-
-            // transaction completes here
-
-            //UBigInt value = fromStructToClass(pValue, m_pPool);
-            //UBigInt saved = fromStructToClass(pKeyVal, m_pPool);
-
-            //std::cout << "after inc position " << elemEmpty << " " << iPosition << " " << value.to_string() << " " << saved.to_string() << std::endl;
-
-            if (elemEmpty)
+            for (i = 0; i < pKeyVal->iFields; ++i)
             {
-                //std::cout << "elemEmpty" << std::endl;
-                // OVERFLOW in VALUE part
-                return 2;
+                // keeps key (func+reprobe), nulls value
+                pKeyVal->pdata[i] = pKeyVal->pdata[i] | pValue->pdata[i];
             }
-
-            // NO OVERFLOW
-            return 1;
-
         }
 
-        return 0;
+        SBIGINT::storeInMemory(pKeyVal->pdata, pPos, iStartOffset, m_iKeyValBits, pKeyVal->iFieldSize);
+
+        if (elemEmpty)
+        {
+            //std::cout << "elemEmpty" << std::endl;
+            // OVERFLOW in VALUE part
+            return 2;
+        }
+
+        // NO OVERFLOW
+        return 1;
 
     }
 
@@ -653,7 +570,7 @@ public:
             if (iIncrementState == 0)
             {
                 //std::cout << "simple increment state 0" << std::endl;
-                singleVerbose = true;
+                //singleVerbose = true;
                 continue;
 
             } else if (iIncrementState == 1)
@@ -740,7 +657,12 @@ public:
                 {
                     // value incremented, but overflow occurred => this was already func => return overflow
 
-                    uint8_t iOverflowReturn = this->handleOverflow(kmer, iPosition, key, reprobes, iInitialReprobes, verbose);
+                    uint8_t iOverflowReturn = 0;
+                    
+                    while (iOverflowReturn == 0)
+                    {
+                        iOverflowReturn = this->handleOverflow(kmer, iPosition, key, reprobes, iInitialReprobes, verbose);
+                    }
 
                     if (iOverflowReturn == 0)
                     {
@@ -812,7 +734,12 @@ public:
 
             if (!lockAcquired)
             {
-                return 2;
+                return 0;
+            }
+
+            if (verbose)
+            {
+                std::cout << "ADDKMER OVERFLOW "<< kmer.to_string() <<" into position" << iPos << " with reprobes " << iReprobe << " performedReprobes " << iPerformedReprobes <<std::endl;
             }
 
             TSX::tsx_key_t reprobePart = this->makeOverflowReprobe(iReprobe, iPerformedReprobes);
@@ -931,8 +858,14 @@ public:
                     // redo increment ...
                     continue;
                 } else if (incremented == 2) {
-                    this->handleOverflow(kmer, iPos, basekey, iReprobe + iPerformedReprobes, iInitialReprobes,
+
+                    uint8_t iOverflowReturn = 0;
+                    while(iOverflowReturn == 0)
+                    {
+                        iOverflowReturn = this->handleOverflow(kmer, iPos, basekey, iReprobe + iPerformedReprobes, iInitialReprobes,
                                          verbose);
+                    }
+                    
                 }
                 //std::cout << "overflow add after " << kmer.to_debug() << " " << this->getKmerCount(kmer).toUInt() << " in pos " << iPos << std::endl;
 
@@ -948,6 +881,34 @@ public:
     }
 
 protected:
+
+    /**
+     *
+     * @param iArrayPos checks whether iArrayPos is locked
+     * @return threadID of thread who locks iArrayPos or -1
+     */ 
+    virtual uint8_t position_locked(uint64_t iArrayPos) override
+    {
+
+        for (uint8_t i = 0; i < m_iThreads; ++i)
+        {
+
+            std::vector<uint64_t>::iterator iPos = std::find(m_pLocked[i].begin(), m_pLocked[i].end(), iArrayPos);
+
+            if (iPos != m_pLocked[i].end())
+            {
+                return i+1;
+            }
+        }
+
+        return 0;
+    }
+
+    virtual bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos) override
+    {
+        uint8_t iPosLocked = this->position_locked(iArrayPos);
+        return (iPosLocked == 0) || (iThreadID+1 == iPosLocked);
+    }
 
     SBIGINT::SBIGINT** m_pTMP_KEYVAL;
     SBIGINT::SBIGINT** m_pTMP_VALUE;

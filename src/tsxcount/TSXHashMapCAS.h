@@ -265,7 +265,7 @@ public:
      * @param verbose
      * @return
      */
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false) override
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false, bool noPrimaryAddition=false) override
     {
         bool bInserted = false;
 
@@ -356,6 +356,8 @@ public:
                     {
                         std::cout << "aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                     }
+
+                    SBIGINT::getFromMemory(pKeyVal, pOrigValue, iStartOffset, m_iKeyValBits, pPos);
 
                     // try again
                     continue;

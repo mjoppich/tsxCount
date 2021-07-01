@@ -35,7 +35,7 @@ std::vector<std::string> createKMers(std::string& sSequence, size_t iK, MemoryPo
 
 }
 
-uint8_t evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std::string* pKmer=NULL, bool print=false)
+uint8_t evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const std::string* pKmer=NULL, bool print=false, std::map<std::string, int>* pCounter=NULL)
 {
 
     UBigInt oRes1 = pMap->getKmerCount(kmer);
@@ -49,23 +49,48 @@ uint8_t evaluate(TSXHashMap* pMap, UBigInt& kmer, const size_t iRefCount, const 
 
     if (iRefCount != iKmer1Count)
     {
-	    std::cout << "error " << (int)iRefCount << " " << (int)iKmer1Count << std::endl;
-#pragma omp critical
+	    if (!print)
         {
-	    if (print)
-	    {
-            std::cout << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;
+            std::cout << "error " << (int)iRefCount << " " << (int)iKmer1Count << std::endl;
+        } else {
 
-            UBigInt oRes2 = pMap->getKmerCount(kmer, true);
-            
-	    if (pKmer != NULL)
-            {
-                std::cout << " " << *pKmer;
-            }
 
-            std::cout <<  std::endl;
-	    }
-        };
+
+#pragma omp critical
+                    {
+                        if (print)
+                        {
+                            std::cout << "kmer: " << kmer.to_string() << "( " << TSXSeqUtils::toSequence(kmer) << " )" << ": " << oRes1.to_string() << " " << std::to_string(iKmer1Count) << " Should be " << iRefCount << std::endl;                           
+
+                            if (pCounter != NULL)
+                            {
+                                std::map<std::string, int>::iterator oCountIT = pCounter->find(*pKmer);
+                                if (oCountIT != pCounter->end())
+                                {
+                                    std::cout << "Manual Counter: " << oCountIT->second << std::endl;
+                                }
+                            }                            
+                            if (pKmer != NULL)
+                            {
+                                std::cout << " " << *pKmer << std::endl;
+                            }
+
+                            UBigInt oRes2 = pMap->getKmerCount(kmer, true);
+
+                            for (int ll=0; ll < 16; ++ll)
+                            {
+                                std::cout << "adding add count " << ll << std::endl;
+                                pMap->addKmer(kmer, true);
+                            }
+                            
+
+                            std::cout <<  std::endl;
+                            std::cout <<  std::endl;
+                        }
+                    };
+
+        }
+
 
 	return 1;
 
@@ -133,6 +158,7 @@ void testHashMap(TSXHashMap* pMap, bool parallel=false)
 
     std::string sFileName = "/mnt/d/owncloud/data/tsx/usmall_t7.fastq";
     sFileName = "../data/small_t7.1000.fastq";
+    sFileName = "../../data/SCER.100.fastq";
     //sFileName = "../data/small_t7.3000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.1000.fastq";
     //sFileName = "/mnt/d/owncloud/data/tsx/small_t7.3000.fastq";

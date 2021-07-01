@@ -814,6 +814,53 @@ public:
 
     }
 
+    void bitXor(const UBigInt & oOther)
+    {
+
+        for (uint32_t i = 0; i < m_iFields; ++i)
+        {
+
+            if ( m_pArray[i] == oOther.m_pArray[i])
+            {
+                m_pArray[i] = 0;
+                continue;
+            }
+
+            m_pArray[i] = m_pArray[i] ^ oOther.m_pArray[i];
+
+
+        }
+        
+    }
+
+    std::vector<uint64_t> onePositions() {
+
+        std::vector<uint64_t> oRet;
+
+        for (uint32_t i = 0; i < m_iFields; ++i)
+        {
+
+            if (m_pArray[i] == 0)
+            {
+                continue;
+            }
+
+            for (uint8_t j = 0; j < m_iFieldSize; ++j)
+            {
+                FIELDTYPE oPosValue = ((m_pArray[i] >> j) & 1);
+
+                if (oPosValue != 0)
+                {
+                    uint64_t iCurPos = i*m_iFields + j;
+                    oRet.push_back(iCurPos);
+                }
+            }
+        }
+
+        return oRet;
+
+    }
+
     static UBigInt fromString(std::string sInput, MemoryPool<FIELDTYPE>* pPool) {
 
         UBigInt oBigInt(sInput.size(), true, pPool);
@@ -1183,6 +1230,8 @@ public:
 
     }
 
+
+
     uint32_t m_iBits = 0;
     uint32_t m_iFields = 0;
 
@@ -1279,13 +1328,7 @@ protected:
 
 
 
-    void bitXor(const UBigInt & oOther)
-    {
 
-        const FIELDTYPE* pOtherField = oOther.m_pArray;
-        this->applyToAllFields( [pOtherField] (FIELDTYPE iValue, uint32_t iField) {return (iValue ^ pOtherField[iField]);} );
-
-    }
 
     void applyToAllFields(std::function<FIELDTYPE(FIELDTYPE, uint32_t)> oOp)
     {

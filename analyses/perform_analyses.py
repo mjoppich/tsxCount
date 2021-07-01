@@ -26,10 +26,10 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--methods', nargs='+', type=str, default=["TSX", "CAS", "OMP"])
     parser.add_argument('-t', '--threads', nargs='+', type=int, default=[1,2,4,8])
     parser.add_argument('-r', '--repeats', type=int, default=3)
-    parser.add_argument('-mt', '--max-time', type=int, default=30)
+    parser.add_argument('-mt', '--max-time', type=str, default="30m")
     parser.add_argument('-e', '--executable', type=argparse.FileType('r'), required=True)
 
-    parser.add_argument('-l', '--L', type=int, default=26)
+    parser.add_argument('-l', '--L', type=int, default=27)
 
     args = parser.parse_args()
 
@@ -51,8 +51,8 @@ if __name__ == '__main__':
             for threadCount in threads:
 
                 for rep in range(0, repeats):
-                    outfile = os.path.join(args.output, ".".join([str(x) for x in [args.sample_base, sample, method, threadCount, rep, "time"]]))
-                    outerr = os.path.join(args.output, ".".join([str(x) for x in [args.sample_base, sample, method, threadCount, "err"]]))
+                    outfile = os.path.join(args.output, ".".join([str(x) for x in [os.path.basename(args.sample_base), sample, method, threadCount, rep, "time"]]))
+                    outerr = os.path.join(args.output, ".".join([str(x) for x in [os.path.basename(args.sample_base), sample, method, threadCount, "err"]]))
 
 
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
                     samplefile = ".".join([args.sample_base, sample, 'fastq'])
 
-                    cmd=["/usr/bin/time", "--verbose", args.executable.name, '--input='+samplefile, '--mode='+method, '--threads='+str(threadCount), "--l=" + str(args.L)]
+                    cmd=["/usr/bin/time", "--verbose", "timeout", "--kill-after", "10s", args.max_time, args.executable.name, '--input='+samplefile, '--mode='+method, '--threads='+str(threadCount), "--l=" + str(args.L)]
                     cmdStr = " ".join(cmd)
 
 
@@ -76,6 +76,8 @@ if __name__ == '__main__':
                     while not runSucceeded:
                         print(sample, method, threadCount, rep)
                         print(cmdStr)
+                        print(outfile)
+                        print(outerr)
                         try:
                             output = subprocess.check_output(cmdStr, shell=True, stderr=subprocess.STDOUT) #, timeout=args.max_time * 60
 

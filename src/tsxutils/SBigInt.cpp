@@ -69,7 +69,7 @@ SBIGINT::SBIGINT *SBIGINT::getEmptySBIGINT(uint16_t iKeyValBits, uint8_t iFields
 
 void SBIGINT::getFromMemory(SBIGINT *pRes, SBIGINT *pFields, uint8_t iOffset, uint16_t iKeyValBits,
                             FIELDTYPE *pData) {
-    uint8_t totalFields = iKeyValBits / pRes->iFieldSize;
+    uint8_t totalFields = iKeyValBits / pRes->iFieldSize; // just complete fields!
     FIELDTYPE iPartOne, iPartTwo;
 
 
@@ -223,7 +223,7 @@ void SBIGINT::getFromMemory(SBIGINT *pRes, uint8_t iOffset, uint16_t iKeyValBits
 void SBIGINT::add_simpleSBIGINT(SBIGINT *pElem) {
 
     FIELDTYPE iCarriage = 1; // in order to add 1
-    FIELDTYPE iMax = 0;
+    FIELDTYPE iBefore = 0;
 
     uint32_t iFields = pElem->iFields;
 
@@ -231,12 +231,12 @@ void SBIGINT::add_simpleSBIGINT(SBIGINT *pElem) {
     uint8_t i = 0;
     for (; i < iFields; ++i) {
 
-        iMax = pElem->pdata[i];
+        iBefore = pElem->pdata[i];
         pElem->pdata[i] = pElem->pdata[i] + iCarriage;
 
         iCarriage = 0;
 
-        if (pElem->pdata[i] < iMax)
+        if (pElem->pdata[i] < iBefore)
             iCarriage = 1;
 
     }

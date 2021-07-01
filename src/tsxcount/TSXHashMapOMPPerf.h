@@ -113,6 +113,11 @@ public:
 
         omp_unset_lock(&m_oOMPLock);
 
+        if (!bRetVal)
+        {
+            std::cout << "trying to release unkept lock!" << std::endl;
+        }
+
         return bRetVal;
     }
 

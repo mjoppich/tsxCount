@@ -10,6 +10,7 @@
 #include "testExecution.h"
 #include <stddef.h>
 #include <immintrin.h>
+#include <omp.h>
 
 
 #include <argp.h>
@@ -30,6 +31,7 @@ static struct argp_option options[] = {
         { "l", 'l', "L", 0, "parameter l"},
         { "input", 'i', "INPUT_FASTA", 0, "input string"},
         { "check", 'c', 0, OPTION_ARG_OPTIONAL, "check counts"},
+        { "checkabort", 'a', 0, OPTION_ARG_OPTIONAL, "abort if check count raises error"},
         { "threads", 't', "THREADS", OPTION_ARG_OPTIONAL, "Number of threads."},
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
@@ -42,6 +44,7 @@ struct arguments {
     uint8_t threads;
     std::string input_path;
     bool check;
+    bool checkabort;
     tsx_mode mode;
 };
 
@@ -79,6 +82,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 't': arguments->threads= atoi(arg); break;
         case 'i': arguments->input_path = (arg != NULL) ? std::string(arg) : ""; break;
         case 'c': arguments->check = true; break;
+        case 'a': arguments->checkabort = true; break;
         case 'm': arguments->mode = strToMode(arg);
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
@@ -91,8 +95,6 @@ static struct argp argp = { options, parse_opt, args_doc, doc, 0, 0, 0 };
 
 void countKMers(TSXHashMap* pMap, struct arguments* pARGP, uint8_t threads)
 {
-
-    const size_t iMaxCount = 2048*4*16;
 
 //    uint8_t threads = pMap->getThreads();
     std::cout << "Threads should be set to " << (int) threads << std::endl;
@@ -108,10 +110,13 @@ void countKMers(TSXHashMap* pMap, struct arguments* pARGP, uint8_t threads)
     sFileName = "/mnt/d/owncloud/data/tsx/small_t7.fastq";
     */
     std::string sFileName = pARGP->input_path;
+    std::set<std::string> oTestSet;
 
     FASTXreader<FASTQEntry>* pReader = new FASTXreader<FASTQEntry>(&sFileName);
 
     uint32_t iK = pMap->getK();
+
+    std::map<std::string, int> m;
 
 //omp_set_num_threads(pMap->getThreads());
 omp_set_num_threads(threads);
@@ -158,10 +163,32 @@ omp_set_num_threads(threads);
                         for (auto kmerStr : allKmers)
                         {
                             TSX::tsx_kmer_t oKmer = TSXSeqUtils::fromSequence(kmerStr, pPool);
-                            bool vadd = false;
-                            std::vector<uint64_t> vAllPos;
+                            //bool vadd = false;
+                            //std::vector<uint64_t> vAllPos;
+
+                            //#pragma omp critical
+                            //{
+                            //    m[kmerStr] = m[kmerStr] + 1;
+                            //}
+
+                            //bool strInSet = true;
+                            //#pragma omp critical
+                            //{
+                            //std::set<std::string>::iterator oKit = oTestSet.find(kmerStr);
+                            //strInSet = oKit != oTestSet.cend();
+                            //oTestSet.insert(kmerStr);
+                            //}
+
+                            //uint32_t iKmerCount1 = pMap->getKmerCount(oKmer, false).toUInt();
 
                             pMap->addKmer(oKmer, verbose); //vadd
+
+                            //uint32_t iKmerCount2 = pMap->getKmerCount(oKmer, false).toUInt();
+
+                            //if (iKmerCount2 == 0)
+                            //{
+                            //    std::cout << "no increment happened! " << kmerStr << std::endl;
+                            //}
                             //iAddedKmers += 1;
                         }
                     }
@@ -176,55 +203,192 @@ omp_set_num_threads(threads);
 
 
         }
+        #pragma omp taskwait
+        #pragma omp barrier
+
 
     }
 
 
 
     std::cout << "Added a total of " << pMap->getKmerCount() << " different kmers" << std::endl;
-
+    uint64_t iRefCount = 0;
     if (pARGP->check)
     {
-        std::map<std::string, uint32_t> kmer2c = loadReferences(sFileName + "." + std::to_string(iK) + ".count");
+        std::string sRefFilename = sFileName + "." + std::to_string(iK) + ".count";
+        uint64_t totalerrors = 0;
+        
+        MemoryPool<FIELDTYPE>* pDirectPool = new DirectMemoryPool<FIELDTYPE>();
 
+        UBigInt queriedPositions = UBigInt(0, pDirectPool);
+        queriedPositions.resize(pMap->getMaxElements());
+
+        #pragma omp parallel
+        {
+        #pragma omp single
+            {
+
+                std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
+
+                std::cerr << "Loading reference file: " << sRefFilename << std::endl;
+                std::ifstream file(sRefFilename);
+
+
+                if (file.is_open()) {
+                    std::string line;
+
+
+
+                    std::map<std::string, int>* pKmer2count = new std::map<std::string, int>();
+
+
+                    while (getline(file, line)) {
+
+                        std::vector<std::string> vElems = split(line);
+
+                        uint32_t iCount = std::atoi(vElems[1].c_str());
+                        std::string kmer = vElems[0];
+
+                        pKmer2count->insert(std::pair<std::string, int>(kmer, iCount));
+
+
+                        if (pKmer2count->size() >= 100000)
+                        {
+                            std::cout << "Going to check " << pKmer2count->size() << " kmers" << std::endl;
+                            iRefCount += pKmer2count->size();
+
+                            #pragma omp task firstprivate(pKmer2count)
+                            {
+
+                                std::map<std::string, int>::iterator oIt;
+                                for (oIt = pKmer2count->begin(); oIt != pKmer2count->end(); ++oIt)
+                                {
+
+                                    std::string kmerStr = oIt->first;
+                                    int kmerCount = oIt->second;
+
+                                    //std::cout << kmerStr << " " << kmerCount << std::endl;
+
+                                    UBigInt tkmer = TSXSeqUtils::fromSequenceD(kmerStr, pMap->getMemoryPool());
+                                    KmerCountDebug oRes = pMap->getKmerCountDebug(tkmer);
+
+                                    uint8_t errorCount = evaluate(pMap, tkmer, kmerCount, &(kmerStr), true, NULL);
+
+                                    if (errorCount)
+                                    {
+                                        if (pARGP->checkabort)
+                                        {
+                                            exit(200);
+                                        }
+                                    }
+
+                                    if (errorCount)
+                                    {
+                                        #pragma omp critical
+                                        {
+                                            totalerrors += errorCount;
+                                            queriedPositions.setBit(oRes.iFirstPos, 1);
+
+                                        }
+                                        
+                                    } else {
+                                        #pragma omp critical
+                                        {
+                                            queriedPositions.setBit(oRes.iFirstPos, 1);
+                                        }
+                                    }
+                                }
+                                std::cout << "Checked " << pKmer2count->size() << " kmers" << std::endl;
+
+
+                                delete pKmer2count;
+                            }
+
+
+                            pKmer2count = new std::map<std::string, int>();
+                        }
+
+
+                    }
+                    file.close();
+
+                    // any remaining kmers are handled here!
+
+                    iRefCount += pKmer2count->size();
+
+                    #pragma omp task firstprivate(pKmer2count)
+                    {
+
+                        std::map<std::string, int>::iterator oIt;
+                        for (oIt = pKmer2count->begin(); oIt != pKmer2count->end(); ++oIt)
+                        {
+
+                            std::string kmerStr = oIt->first;
+                            int kmerCount = oIt->second;
+
+                            //std::cout << kmerStr << " " << kmerCount << std::endl;
+
+                            UBigInt tkmer = TSXSeqUtils::fromSequenceD(kmerStr, pMap->getMemoryPool());
+                            KmerCountDebug oRes = pMap->getKmerCountDebug(tkmer);
+                            uint8_t errorCount = evaluate(pMap, tkmer, kmerCount, &(kmerStr), true, NULL);
+
+                            if (errorCount)
+                            {
+                                #pragma omp critical
+                                {
+                                    totalerrors += errorCount;
+                                    queriedPositions.setBit(oRes.iFirstPos, 1);
+
+                                }
+                                
+                            } else {
+                                #pragma omp critical
+                                {
+                                    queriedPositions.setBit(oRes.iFirstPos, 1);
+                                }
+                            }
+                        }
+                        std::cout << "Checked " << pKmer2count->size() << " kmers" << std::endl;
+
+
+                        delete pKmer2count;
+                    }
+
+                }
+            }
+        }
+
+    	std::cout << "total errors" << (int) totalerrors << std::endl;
+        std::cout << "Kmer count check completed." << std::endl;
 
         // checking counts
-        std::cout << "Checking kmer counts against manual hashmap ..." << std::endl;
-        std::cout << "Manual counts: " << kmer2c.size() << std::endl;
+        std::cout << "Reference kmer count: " << (int) iRefCount << std::endl;
+        std::cout << "queried kmer count: " << (int) queriedPositions.sumBits() << std::endl;
+        std::cout << "tsxCount kmer count: " << (int) pMap->getKmerCount() << std::endl;
 
-	uint64_t totalerrors = 0;
-	std::map<std::string, uint32_t>::iterator it;
+        std::cout << "calculating quered positions" << std::endl;
+        UBigInt& oKmerStarts = pMap->getKmerStartsRef();
+        std::cout << "got kmer starts" << std::endl;
+        queriedPositions.bitXor(oKmerStarts);
+        std::cout << "queried (kmerstarts) kmer count: " << (int) oKmerStarts.sumBits() << std::endl;
+        std::cout << "queried (Xor) kmer count: " << (int) queriedPositions.sumBits() << std::endl;
 
-#pragma omp parallel
-	{
-#pragma omp single
-		{
-	for (it = std::begin(kmer2c); it != std::end(kmer2c); ++it)
-        {
-//#pragma omp task
-		{
+        if (queriedPositions.sumBits() > 0)
+        {  
+            std::vector<uint64_t> vOnePos = queriedPositions.onePositions();
+            std::cout << "queried one pos count: " << (int) vOnePos.size() << std::endl;
 
-            // Do something with x, e.g.
-            UBigInt tkmer = TSXSeqUtils::fromSequenceD(it->first, pMap->getMemoryPool());
-            uint8_t errorCount = evaluate(pMap, tkmer, it->second, &(it->first), false);
-
-	    if (errorCount)
-	    {
-	        #pragma omp critical
-	        totalerrors += errorCount;
-	    }
-		}
+            for (size_t j = 0; j < vOnePos.size(); ++j)
+            {
+                uint64_t iCurPos = vOnePos[j];
+                //pMap->getCountAtPosition(iCurPos);
+            }
         }
-		}
-	}
 
-	std::cout << "total errors" << (int) totalerrors << std::endl;
     }
 
 
 
-
-    std::cout << "Kmer count check completed." << std::endl;
 
 
 }
@@ -304,10 +468,14 @@ int main(int argc, char *argv[])
     if (pPerfTSX = dynamic_cast<TSXHashMapTSXPerf*>(pMap))
     {
 
+        std::cerr << "addkmer-inserted count" << pPerfTSX->iInsertedCount << std::endl;
         std::cerr << "Used fields: " << pPerfTSX->getUsedPositions() << std::endl;
         std::cerr << "adds: " << pPerfTSX->iAddCount << std::endl;
         std::cerr << "add calls: " << pPerfTSX->iAddKmerCount << std::endl;
         std::cerr << "aborts calls: " << pPerfTSX->iAborts << std::endl;
+
+        pPerfTSX->print_counts();
+
     } else if (pCAS = dynamic_cast<TSXHashMapCAS*>(pMap))
     {
 

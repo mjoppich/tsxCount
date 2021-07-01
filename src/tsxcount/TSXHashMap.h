@@ -46,6 +46,12 @@ protected:
 
 };
 
+struct KmerCountDebug
+{
+    UBigInt oCount;
+    uint64_t iFirstPos;
+};
+
 /**
  * \class TSXHashMap
  *
@@ -78,7 +84,8 @@ public:
               m_iKeyValBits( 2 * iK + iStorageBits ),
               m_iK( iK ),
               m_iMaxReprobes( (uint32_t) (1 << iL)-1 ),
-              m_iMapSize( UBigInt::createFromBitShift(iL, iL, this->m_pPool))
+              m_iMapSize( UBigInt::createFromBitShift(iL, iL, this->m_pPool)),
+              m_iElements(std::pow(2, iL))
     {
 
         if (2 * m_iK <= m_iL)
@@ -86,19 +93,19 @@ public:
             throw TSXException("Invalid lengths for hashmap size and value of k");
         }
 
-        size_t iElements = std::pow(2, m_iL);
 
         // 2*k = key, m_iStorageBits = value
         size_t iBitsPerElement = 2 * m_iK + m_iStorageBits;
-        size_t iBytes = std::ceil( (float)(iElements * iBitsPerElement) / 8.0f);
+        size_t iBytes = std::ceil( (float)(m_iElements * iBitsPerElement) / 8.0f);
 
-        std::cerr << "Creating array with " << std::to_string(iBytes) << " bytes for " << std::to_string(iElements) << " places." << std::endl;
+        std::cerr << "Creating array with " << std::to_string(iBytes) << " bytes for " << std::to_string(m_iElements) << " places." << std::endl;
+        std::cerr << "Maximum number of allowed reprobes per element: " << (int) m_iMaxReprobes << std::endl;
         m_pCounterArray = (FIELDTYPE*) calloc( sizeof(FIELDTYPE), iBytes);
 
         MemoryPool<FIELDTYPE>* pDirectPool = new DirectMemoryPool<FIELDTYPE>();
 
         m_iKmerStarts = UBigInt(0, pDirectPool);
-        m_iKmerStarts.resize(iElements);
+        m_iKmerStarts.resize(m_iElements);
 
 
         m_mask_value_key = UBigInt(2*m_iK + m_iStorageBits, true, this->m_pPool);
@@ -152,6 +159,10 @@ public:
         free(m_pCounterArray);
     }
 
+    uint64_t getMaxElements()
+    {
+        return m_iElements;
+    }
 
     MemoryPool<FIELDTYPE>* getMemoryPool()
     {
@@ -168,8 +179,10 @@ public:
         return m_setUsedPositions.size();
     }
 
-    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false)
+    virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false, bool noPrimaryAddition=false)
     {
+
+        exit(200);
 
         bool bInserted = false;
 
@@ -449,12 +462,96 @@ public:
         return vPositions;
     }
 
-    virtual UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false)
+    uint32_t getCountAtPosition(uint64_t iPos)
+    {
+        if (m_iKmerStarts.getBit(iPos) != 1)
+        {
+            return -1;
+        }
+
+        TSX::tsx_keyval_t elemKeyVal = this->getElement(iPos);
+
+        std::cout << "Got KMer at position " << (int) iPos << std::endl;
+        std::cout << elemKeyVal.to_string() << std::endl;
+        std::cout << elemKeyVal.to_debug() << std::endl;
+    }
+
+    virtual KmerCountDebug getKmerCountDebug(TSX::tsx_kmer_t& kmer, bool verbose=false, uint32_t addReprobes=0)
     {
         bool bFound = false;
+        uint32_t iReprobes=1 + addReprobes;
+
+        TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
+
+        UBigInt oResult(16, true, this->m_pPool);
+        uint64_t iPos = 0;
+
+        while ((!bFound) && ( iReprobes < m_iMaxReprobes))
+        {
+
+            // get possible position
+            iPos = this->getPosition( basekey, iReprobes);
+
+            // does this position match to key?
+            bool bEmpty = positionEmpty(iPos);
+
+            if (!bEmpty)
+            {
+
+                TSX::tsx_keyval_t elem = this->getElement(iPos);
+                bool bMatchesKey = positionMatchesKeyAndReprobe(iPos, basekey, iReprobes);
+
+                if (bMatchesKey)
+                {
+                    bFound = true;
+                    oResult = this->getValFromKeyVal(elem);
+
+                    // TODO find possible remaining entries!
+                    UBigInt oOverflows = findOverflowCounts(iPos, basekey, iReprobes, verbose);
+
+                    uint32_t iUsedOverflowBits = oOverflows.getBitCount();
+                    if (iUsedOverflowBits > 0)
+                    {
+                        oOverflows.resize( iUsedOverflowBits + m_iStorageBits );
+
+                        oOverflows = oOverflows << m_iStorageBits;
+                        oOverflows = oOverflows | oResult;
+
+                        oResult = oOverflows;
+                    }
+                    break;
+
+                }
+
+            } else {
+                break;
+            }
+            ++iReprobes;
+        }
+
+        if (!bFound)
+        {
+            if (verbose)
+            {
+                std::cerr << "Kmer " << kmer.to_string() << " not in hash" << std::endl;
+            }
+        }
+
+        KmerCountDebug oRet = KmerCountDebug();
+        oRet.oCount = oResult;
+        oRet.iFirstPos = iPos;
+
+        return oRet;
+    }
 
 
-        uint32_t iReprobes = 1;
+
+
+    virtual UBigInt getKmerCount(TSX::tsx_kmer_t& kmer, bool verbose=false, uint32_t addReprobes=0)
+    {
+        bool bFound = false;
+        uint32_t iReprobes=1 + addReprobes;
+
         TSX::tsx_key_t basekey = m_pHashingFunction->apply( kmer );
 
         UBigInt oResult(16, true, this->m_pPool);
@@ -477,8 +574,17 @@ public:
 
                 if (bMatchesKey)
                 {
-                    bFound = true;
 
+                    /*
+                    if (addReprobes>0)
+                    {
+                        --addReprobes;
+                        ++iReprobes;
+                        continue;
+                    }
+                    */
+
+                    bFound = true;
 
                     oResult = this->getValFromKeyVal(elem);
 
@@ -511,10 +617,13 @@ public:
                         std::cout << oOverflows.to_string() << std::endl;
                     }
 
+                    break;
+
                 }
 
             } else {
                 // why would the insertion skip an empty place?
+                //std::cout << "skipping empty place in finding kmer" << std::endl;
                 break;
             }
             ++iReprobes;
@@ -538,6 +647,16 @@ public:
     uint64_t getKmerCount()
     {
         return this->m_iKmerStarts.sumBits();
+    }
+
+    UBigInt getKmerStarts()
+    {
+        return m_iKmerStarts;
+    }
+
+    UBigInt& getKmerStartsRef()
+    {
+        return m_iKmerStarts;
     }
 
     std::vector<TSX::tsx_kmer_t> getAllKmers()
@@ -721,6 +840,7 @@ protected:
 
     virtual void initialiseLocks()
     {
+        exit(200);
     }
 
 
@@ -731,11 +851,13 @@ protected:
      */
     virtual uint8_t position_locked(uint64_t iArrayPos)
     {
+        exit(200);
         return omp_get_thread_num();
     }
 
     virtual bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
+        exit(200);
         return true;
     }
 
@@ -747,6 +869,7 @@ protected:
      */
     virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
+        exit(200);
         return true;
     }
 
@@ -759,10 +882,12 @@ protected:
      */
     virtual void unlock_thread(uint8_t iThreadID)
     {
+        exit(200);
     }
 
     virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
     {
+        exit(200);
         return true;
     }
 
@@ -842,7 +967,7 @@ protected:
 
         uint32_t iInitialReprobes = iReprobe;
 
-        while (iPerformedReprobes < 10)
+        while (iPerformedReprobes < m_iMaxReprobes)
         {
 
             iPerformedReprobes += 1;
@@ -858,8 +983,8 @@ protected:
             if (!bEmpty)
             {
 
-                if (m_iKmerStarts.getBit(iPos) == 1)
-                    continue;
+                //if (m_iKmerStarts.getBit(iPos) == 1)
+                //    continue;
                 //std::cout << "OVFL B Match Key " << iPos << " " << iReprobe << std::endl;
 
                 // the reprobe part must match the number of reprobes back to the previous entry!
@@ -872,7 +997,7 @@ protected:
                     {
                         TSX::tsx_keyval_t elem = this->getElement(iPos);
 
-                        std::cout << "OVFL Unmatched Key; orig pos " << origPos << " test pos " << iPos << " initial reprobes " << iInitialReprobes << " reprobe " << iReprobe << " perf reprobe " << iPerformedReprobes << " all_reprobes " << iPerformedReprobes+iReprobe << std::endl;
+                        std::cout << "OVFL Unmatched Key; orig pos " << origPos << " test pos " << iPos << " initial reprobes " << iInitialReprobes << " reprobe " << iReprobe << " performed_reprobes " << iPerformedReprobes << " all_reprobes " << iPerformedReprobes+iReprobe << std::endl;
                         std::cout << elem.to_string() << std::endl;
 
                         TSX::tsx_key_t oReprobe = this->makeOverflowReprobe(iReprobe, iPerformedReprobes);//iReprobe, this->m_pPool);
@@ -909,6 +1034,9 @@ protected:
                 // now we can try to find further matching positions :)
                 iPerformedReprobes = 0;
 
+            } else {
+                //why skip empty place?
+                break;
             }
 
         }
@@ -957,7 +1085,6 @@ protected:
     {
 
         TSX::tsx_keyval_t oKeyVal = getElement(pos);
-
         TSX::tsx_func_t oKeyValFunc = (oKeyVal >> (m_iL + m_iStorageBits));
         TSX::tsx_func_t oKeyFunc = (key >> (m_iL));
 
@@ -971,10 +1098,6 @@ protected:
         {
             return true;
         } else {
-
-            //std::cerr << key.to_string() << std::endl;
-            //std::cerr << oKeyVal.to_string() << std::endl;
-
             return false;
         }
     }
@@ -1026,7 +1149,6 @@ protected:
         // we want to get the iPosition-th entry
         uint32_t iBitsPerField = sizeof(uint8_t) * 8;
         uint32_t iDivPos = pos * m_iKeyValBits;
-
         std::div_t oStartPos = udiv( iDivPos, iBitsPerField);
 
         //UBigInt oReturn(m_iKeyValBits);
@@ -1389,6 +1511,8 @@ protected:
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
 
+        exit(200);
+
         if (kmer != NULL)
         {
             std::string sKmerStr = toSequence(*kmer);
@@ -1532,6 +1656,7 @@ protected:
     const uint32_t m_iMaxReprobes;
 
     const UBigInt m_iMapSize;
+    const uint64_t m_iElements;
 
     UBigInt m_iKmerStarts;
 

@@ -59,33 +59,6 @@ public:
     }
 
 
-    /**
-     *
-     * @param iArrayPos checks whether iArrayPos is locked
-     * @return threadID of thread who locks iArrayPos or -1
-     */
-    uint8_t position_locked(uint64_t iArrayPos)
-    {
-
-        for (uint8_t i = 0; i < m_iThreads; ++i)
-        {
-
-            std::vector<uint64_t>::iterator iPos = std::find(m_pLocked[i].begin(), m_pLocked[i].end(), iArrayPos);
-
-            if (iPos != m_pLocked[i].end())
-            {
-                return i+1;
-            }
-        }
-
-        return 0;
-    }
-
-    bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos) override
-    {
-        uint8_t iPosLocked = this->position_locked(iArrayPos);
-        return iPosLocked == 0 or iThreadID+1 == iPosLocked;
-    }
 
     /**
      *
