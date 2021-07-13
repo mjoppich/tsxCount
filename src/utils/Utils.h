@@ -2,8 +2,8 @@
 // Created by mjoppich on 11/1/17.
 //
 
-#ifndef TSXCOUNT_STRINGUTILS_H_H
-#define TSXCOUNT_STRINGUTILS_H_H
+#ifndef TSXCOUNT_SPLITUTILS_H_H
+#define TSXCOUNT_SPLITUTILS_H_H
 
 #include <string>
 #include <vector>
@@ -48,4 +48,4 @@ public:
     }
 };
 
-#endif //TSXCOUNT_STRINGUTILS_H_H
+#endif //TSXCOUNT_SPLITUTILS_H_H
