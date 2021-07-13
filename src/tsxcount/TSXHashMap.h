@@ -182,8 +182,6 @@ public:
     virtual bool addKmer(TSX::tsx_kmer_t& kmer, bool verbose=false, bool noPrimaryAddition=false)
     {
 
-        exit(200);
-
         bool bInserted = false;
 
         uint32_t iReprobes = 1;
@@ -840,7 +838,6 @@ protected:
 
     virtual void initialiseLocks()
     {
-        exit(200);
     }
 
 
@@ -851,13 +848,11 @@ protected:
      */
     virtual uint8_t position_locked(uint64_t iArrayPos)
     {
-        exit(200);
         return omp_get_thread_num();
     }
 
     virtual bool canAcquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
-        exit(200);
         return true;
     }
 
@@ -869,7 +864,6 @@ protected:
      */
     virtual bool acquireLock(uint8_t iThreadID, uint64_t iArrayPos)
     {
-        exit(200);
         return true;
     }
 
@@ -882,12 +876,10 @@ protected:
      */
     virtual void unlock_thread(uint8_t iThreadID)
     {
-        exit(200);
     }
 
     virtual bool releaseLock(uint8_t iThreadID, uint64_t iPos)
     {
-        exit(200);
         return true;
     }
 
@@ -1510,8 +1502,6 @@ protected:
     {
         uint32_t iPerformedReprobes = 0;
         uint8_t iThreadID = omp_get_thread_num();
-
-        exit(200);
 
         if (kmer != NULL)
         {

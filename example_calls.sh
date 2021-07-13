@@ -1,0 +1,1 @@
+python3 analyses/perform_analyses.py --threads 16 --methods EXPERIMENTAL  --samples 100 --sample-base ../data/SCER --executable ./build/tsxCount --output runs_weismann_new --max-time 60m
