@@ -9,6 +9,16 @@
 #include <tsxutils/UBigInt.h>
 #include <tsxcount/TSXTypes.h>
 
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <functional>
+
 namespace TSXSeqUtils {
 
 
@@ -153,6 +163,31 @@ namespace TSXSeqUtils {
     static TSX::tsx_kmer_t fromSequenceD(std::string seq, MemoryPool<FIELDTYPE>* pPool)
     {
         return TSXSeqUtils::fromSequence(seq, pPool);
+    }
+
+
+    static std::vector<std::string> split(const std::string &sString, char cDelim) {
+
+        std::vector<std::string> vret;
+
+        std::stringstream sStringStream( sString );
+        std::string sItem;
+        while (std::getline(sStringStream, sItem, cDelim)) {
+            vret.push_back(sItem);
+        }
+        return vret;
+    }
+
+
+    static bool file_exists(const std::string* name)
+    {
+
+        if (name == NULL)
+            return false;
+
+        struct stat buffer;
+        return (stat (name->c_str(), &buffer) == 0);
+
     }
 
 }

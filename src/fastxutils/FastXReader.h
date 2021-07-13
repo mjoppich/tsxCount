@@ -11,7 +11,7 @@
 #include <vector>
 #include <fstream>
 #include <utils/CLParser.h>
-#include <utils/Utils.h>
+#include <utils/SequenceUtils.h>
 
 #define FASTQREADER_ZLIB_CHUNK 65536
 
@@ -323,7 +323,7 @@ protected:
                     std::string sZLIBChunk = this->zlib_uncompress(pInBuffer, iBytesRead);
 
                     m_sBufferedText.append( sZLIBChunk );
-                    std::vector<std::string> vChunkLines = Utils::split(m_sBufferedText, '\n');
+                    std::vector<std::string> vChunkLines = TSXSeqUtils::split(m_sBufferedText, '\n');
 
                     bool bLastWasNewline = m_sBufferedText.at(m_sBufferedText.size()-1) == '\n';
                     size_t iCopyLines = vChunkLines.size()-1;

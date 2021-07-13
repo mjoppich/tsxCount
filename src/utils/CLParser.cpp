@@ -29,7 +29,7 @@ CLParser::CLParser(std::string sArgs)
 {
 
     const std::string sInput = std::string(sArgs);
-    std::vector<std::string> vArgs = Utils::split(sInput, ' ');
+    std::vector<std::string> vArgs = TSXSeqUtils::split(sInput, ' ');
     vArgs.insert(vArgs.begin(), std::string("."));
 
     char** ppArgs = new char*[vArgs.size()];

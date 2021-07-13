@@ -116,6 +116,9 @@ file(GLOB tsxcountlib_SRC
         "src/tsxcount/*.cpp"
 )
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/)
+
+
 MESSAGE(${tsxcountlib_SRC})
 
 add_library(tsxcounter ${tsxcountlib_SRC} ${tsxcountlib_h} )
@@ -143,7 +146,6 @@ target_include_directories (tsxcounter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS tsxutils DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 install(FILES ${tsxutilslib_h} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include/)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../splitter/include)
 ADD_LIBRARY(splitutils STATIC IMPORTED src/utils/CLParser.cpp src/utils/CLParser.h)
 SET_TARGET_PROPERTIES(splitutils PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../splitter/lib/libsplitutils.a)
 

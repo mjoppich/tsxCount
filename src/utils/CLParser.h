@@ -8,7 +8,7 @@
 #include <map>
 #include <inttypes.h>
 #include <iostream>
-#include <utils/Utils.h>
+#include <utils/SequenceUtils.h>
 
 
 class CLParserException: public std::exception
@@ -75,7 +75,7 @@ public:
     {
         std::string* pFileName = this->getArgument(sArg);
 
-        if (!Utils::file_exists(pFileName))
+        if (!TSXSeqUtils::file_exists(pFileName))
             return NULL;
 
         return pFileName;
