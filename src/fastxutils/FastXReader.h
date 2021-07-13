@@ -10,8 +10,8 @@
 #include <zlib.h>
 #include <vector>
 #include <fstream>
-#include "../utils/CLParser.h"
-#include "../utils/Utils.h"
+#include <utils/CLParser.h>
+#include <utils/Utils.h>
 
 #define FASTQREADER_ZLIB_CHUNK 65536
 
