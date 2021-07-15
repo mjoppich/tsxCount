@@ -291,21 +291,37 @@ public:
             {
                 //__atomic_fetch_or (pPos+i, pPos[i], __ATOMIC_RELAXED);
                 //__atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+                //__atomic_store(pKeyVal->pdata+i, pKeyVal->pdata+i, __ATOMIC_RELAXED);
+                //__atomic_store(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, __ATOMIC_RELAXED);
+
+
                 //__builtin_prefetch(pPos+i, 0, 3);
-                __builtin_prefetch(pPos+i, 1, 3);
+                //__builtin_prefetch(pPos+i, 1, 3);
                 __atomic_compare_exchange_n(pPos+i, pPos+i, *(pPos+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+                //__atomic_compare_exchange_n(pKeyVal->pdata+i, pKeyVal->pdata+i, *(pKeyVal->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+                //__atomic_compare_exchange_n(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, *(pKeyReprobeShift->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+
+
                 prefVal = pPos[i];
                 prefVal = pKeyVal->pdata[i];
                 prefVal = pKeyReprobeShift->pdata[i];
             }
 	        //prefVal = pPos[pKeyVal->iFields];
             //__atomic_store(pPos+i, pPos+i, __ATOMIC_RELAXED);
+            //__atomic_store(pKeyVal->pdata+i, pKeyVal->pdata+i, __ATOMIC_RELAXED);
+            //__atomic_store(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, __ATOMIC_RELAXED);
+
+
             //__builtin_prefetch(pPos+i, 0, 3);
+            //__builtin_prefetch(pPos+i, 1, 3);
             __atomic_compare_exchange_n(pPos+i, pPos+i, *(pPos+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
-            __builtin_prefetch(pPos+i, 1, 3);
-            m_iKmerStarts.getBit(iPos);
+            //__atomic_compare_exchange_n(pKeyVal->pdata+i, pKeyVal->pdata+i, *(pKeyVal->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            //__atomic_compare_exchange_n(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, *(pKeyReprobeShift->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            //m_iKmerStarts.setBit(iPos,m_iKmerStarts.getBit(iPos));
+            m_iKmerStarts.preloadBit(iPos);
 
 
+	    SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
 
@@ -319,6 +335,7 @@ public:
 
             uint16_t iKeyValBits = m_iKeyValBits;
             asm volatile("":::"memory");
+
 
 
             if ((status = _xbegin ()) == _XBEGIN_STARTED) {
@@ -400,7 +417,14 @@ public:
                 } else {
                     pCounter[iThreadID][status].increment();
                 }
-                               
+
+                /*             
+                if (status == 0)
+                {
+                std::cout << "kmer error 0 in addkmer" << std::endl;
+                }
+                */
+
                 if (xAbortStatus == 0xff) {
                     // only if status is 0xff - no other scenario
 
@@ -575,6 +599,7 @@ public:
 
         uint8_t iThreadID = omp_get_thread_num();
         uint8_t allowedTSXRetries = 10;
+        uint status;
 
         //std::cout << "in inc key value" << std::endl;
 
@@ -593,13 +618,13 @@ public:
             SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
             SBIGINT::clear(pKeyVal); // ADD 210621
 
+
             uint8_t i;
             bool elemEmpty = false;
 
             asm volatile("":: :"memory");
 
-
-            uint status = _xbegin();
+            status = _xbegin();
             if (status == _XBEGIN_STARTED) {
 
                 //this->performIncrement(&incRet);
@@ -684,6 +709,13 @@ public:
                  * TODO abort stats
                  */
 
+                /*
+                if (status == 0)
+                {
+                std::cout << "key val returned status 0" << std::endl;
+                }
+                */
+
                 if (verbose)
                 {
 
@@ -735,6 +767,8 @@ public:
 
 
         }
+
+        //std::cout << "key value return 0" << (int) status << std::endl;
 
         return 0;
 
@@ -927,6 +961,7 @@ public:
             {
                 //std::cout << "simple increment state 0 at position " << iPosition << std::endl;
                 singlePrefetch = true;
+                //std::cout << "error 0 in key value" << std::endl;
                 continue;
 
             } else if (iIncrementState == 1)
@@ -994,6 +1029,7 @@ public:
 
                 if (iIncrementFuncState == 0)
                 {
+		std::cout << "error 0 in inc element func" << std::endl;
                     continue;
 
                 } else if (iIncrementFuncState == 1)

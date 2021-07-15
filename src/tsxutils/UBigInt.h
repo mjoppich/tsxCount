@@ -752,6 +752,16 @@ public:
         return (uint8_t) iFieldValue;
     }
 
+    void preloadBit(uint32_t iBitPosition) const
+    {
+        sBitPosition oPos = this->getBitPosition(iBitPosition);
+
+        FIELDTYPE* pFieldValue = m_pArray+ oPos.iField;
+
+
+        __atomic_compare_exchange_n(pFieldValue, pFieldValue, *(pFieldValue), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+    }
+
     void setBit(uint64_t iBit, uint8_t iValue)
     {
 
