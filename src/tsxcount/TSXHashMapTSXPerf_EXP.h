@@ -151,7 +151,7 @@ public:
 
                 // transaction completes here
                 _xend();
-                asm volatile("":: :"memory");
+                //asm volatile("":: :"memory");
 
 
                 //UBigInt value = fromStructToClass(pValue, m_pPool);

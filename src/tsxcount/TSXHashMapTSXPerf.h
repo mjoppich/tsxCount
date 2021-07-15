@@ -297,7 +297,7 @@ public:
 
                 //__builtin_prefetch(pPos+i, 0, 3);
                 //__builtin_prefetch(pPos+i, 1, 3);
-                __atomic_compare_exchange_n(pPos+i, pPos+i, *(pPos+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+                __atomic_compare_exchange(pPos+i, pPos+i, pPos+i, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
                 //__atomic_compare_exchange_n(pKeyVal->pdata+i, pKeyVal->pdata+i, *(pKeyVal->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
                 //__atomic_compare_exchange_n(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, *(pKeyReprobeShift->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
@@ -314,14 +314,14 @@ public:
 
             //__builtin_prefetch(pPos+i, 0, 3);
             //__builtin_prefetch(pPos+i, 1, 3);
-            __atomic_compare_exchange_n(pPos+i, pPos+i, *(pPos+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            __atomic_compare_exchange(pPos+i, pPos+i, pPos+i, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
             //__atomic_compare_exchange_n(pKeyVal->pdata+i, pKeyVal->pdata+i, *(pKeyVal->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
             //__atomic_compare_exchange_n(pKeyReprobeShift->pdata+i, pKeyReprobeShift->pdata+i, *(pKeyReprobeShift->pdata+i), true, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
             //m_iKmerStarts.setBit(iPos,m_iKmerStarts.getBit(iPos));
             m_iKmerStarts.preloadBit(iPos);
 
 
-	    SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
+	        SBIGINT::getFromMemory(pKeyVal, iStartOffset, m_iKeyValBits, pPos);
 
             TSX::tsx_keyval_t key_reprobe_shift = this->makeKey(basekey, iReprobes);
 
@@ -334,7 +334,7 @@ public:
             int iinc=0;
 
             uint16_t iKeyValBits = m_iKeyValBits;
-            asm volatile("":::"memory");
+            //asm volatile("":::"memory");
 
 
 
@@ -368,7 +368,7 @@ public:
                 //SBIGINT::storeInMemory(key_reprobe_shift.m_pArray, pPos, iStartOffset, m_iKeyValBits, sizeof(FIELDTYPE)*8);
                 // transaction completes here
                 _xend();
-                asm volatile("":::"memory");
+                //asm volatile("":::"memory");
 
                 //std::cout << "after add and transaction" << std::endl;
 
@@ -387,6 +387,7 @@ public:
                 if (oIt != m_setUsedPositions.end())
                 {
                     std::cout << "already found kmer inserted at position " << iPos << std::endl;
+                    std::exit(222);
                 }
                 
                 m_setUsedPositions.insert(iPos);
@@ -540,8 +541,6 @@ public:
                 if (iTotalAborts % 100000 == 0)
                 {
                     std::cout << "addkmer aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
-                    std::cout << (int) status << std::endl;
-
                 }
             }
 
@@ -622,7 +621,7 @@ public:
             uint8_t i;
             bool elemEmpty = false;
 
-            asm volatile("":: :"memory");
+            //asm volatile("":: :"memory");
 
             status = _xbegin();
             if (status == _XBEGIN_STARTED) {
@@ -682,7 +681,7 @@ public:
 
                 // transaction completes here
                 _xend();
-                asm volatile("":: :"memory");
+                //asm volatile("":: :"memory");
 
 
                 //UBigInt value = fromStructToClass(pValue, m_pPool);
@@ -806,7 +805,7 @@ public:
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
             PREFETCH = pPos[0];
-            asm volatile("":: :"memory");
+            //asm volatile("":: :"memory");
 
             SBIGINT::SBIGINT* pKeyVal = m_pTMP_KEYVAL[iThreadID];
             SBIGINT::SBIGINT* pValue = m_pTMP_VALUE[iThreadID];
@@ -883,7 +882,7 @@ public:
 
                 // transaction completes here
                 _xend();
-                asm volatile("":: :"memory");
+                //asm volatile("":: :"memory");
 
 
                 /*
@@ -1220,7 +1219,7 @@ public:
 
             // THIS PREFETCH is necessary to avoid stupid status==0...
             PREFETCH = pPos[0];
-            asm volatile("":::"memory");
+            //asm volatile("":::"memory");
 
             uint status = _xbegin();
             if(status == _XBEGIN_STARTED) {
@@ -1250,7 +1249,7 @@ public:
 
                 // transaction completes here
                 _xend();
-                asm volatile("":::"memory");
+                //asm volatile("":::"memory");
 
 		#pragma omp critical
 		{
@@ -1331,10 +1330,6 @@ public:
                     --iPerformedReprobes;
 
                     ++iAborts;
-                }
-
-                if (iTotalAborts % 1000 == 0) {
-                    std::cout << "aborts " << iTotalAborts << " inserts " << iAddCount << std::endl;
                 }
 
             }
