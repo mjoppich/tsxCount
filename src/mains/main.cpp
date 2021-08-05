@@ -21,6 +21,7 @@
 #include <tsxcount/TSXHashMapPerf.h>
 #include <tsxcount/TSXHashMapPThreadPerf.h>
 #include <tsxcount/TSXHashMapTSXPerf_EXP.h>
+#include <tsxcount/TSXHashMapOMPPerfCount.h>
 
 const char *argp_program_version = "tsxCount 1.0";
 const char *argp_program_bug_address = "joppich@bio.ifi.lmu.de";
@@ -37,8 +38,8 @@ static struct argp_option options[] = {
         { "mode", 'm', "MODE", OPTION_ARG_OPTIONAL, "counting mode"},
         { 0 }
 };
-enum tsx_mode{ SERIAL, PTHREAD,OMP, CAS, TRANSACTIONAL, EXPERIMENTAL };
-const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TSX", "EXPERIMENTAL" };
+enum tsx_mode{ SERIAL, PTHREAD,OMP, CAS, TRANSACTIONAL, EXPERIMENTAL, OMP_COUNT };
+const char * TSXModeStrings[] = { "SERIAL", "PTHREAD", "OMP", "CAS", "TSX", "EXPERIMENTAL", "OMP_COUNT" };
 
 struct arguments {
     uint16_t k,l,storagebits;
@@ -71,6 +72,9 @@ tsx_mode strToMode(char* pArg)
     } else if (argStr == "EXPERIMENTAL")
     {
         return tsx_mode::EXPERIMENTAL;
+    } else if (argStr == "OMP_COUNT")
+    {
+        return tsx_mode::OMP_COUNT;
     }
 
     return tsx_mode::TRANSACTIONAL;
@@ -456,9 +460,13 @@ int main(int argc, char *argv[])
             pMap = new TSXHashMapTSXPerf(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
         case EXPERIMENTAL:
-            std::cerr << "Creating TSXHashMap TRANSACTIONS/TSX" << std::endl;
+            std::cerr << "Creating TSXHashMap TRANSACTIONS/TSX (EXP)" << std::endl;
             pMap = new TSXHashMapTSXPerfExperimental(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
             break;
+        case OMP_COUNT:
+            std::cerr << "Creating TSXHashMap OMP_COUNT" << std::endl;
+            pMap = new TSXHashMapOMPPerfCount(arguments.l, arguments.storagebits, arguments.k, arguments.threads);
+
         default:
             std::cerr << "Creating TSXHashMap DEFAULT(TRANSACTIONS/TSX)" << std::endl;
 
